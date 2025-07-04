@@ -52,10 +52,16 @@ export async function createProject(input: CreateProjectInput) {
             columns: {
               createMany: {
                 data: [
-                  { name: "To Do", order: 0 },
-                  { name: "In Progress", order: 1 },
-                  { name: "Review", order: 2 },
-                  { name: "Done", order: 3 }
+                  { name: "PR", order: 0 },
+                  { name: "Canvass", order: 1 },
+                  { name: "CQS for Signature", order: 2 },
+                  { name: "For PO", order: 3 },
+                  { name: "For Budget", order: 4 },
+                  { name: "For Release", order: 5} ,
+                  { name: "PO for Signature", order: 6 },
+                  { name: "Accounting", order: 7 },
+                  { name: "PO Completed", order: 8 },
+                  { name: "Delivered", order: 9 }
                 ]
               }
             }

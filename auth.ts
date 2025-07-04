@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import authConfig from "@/auth.config";
 import { getUserById } from "@/data/user";
 import { getAccountByUserId } from "./data/account";
+import { logUserLogin } from "./lib/audit-login-logout";
+
 
 export const {
   handlers: { GET, POST },
@@ -29,12 +31,45 @@ export const {
   callbacks: {
     async signIn({ user, account }) {
       // Allow OAuth without email verification
-      if (account?.provider !== "credentials") return true;
+      if (account?.provider !== "credentials") {
+        // Log OAuth login
+        if (user.id) {
+          await logUserLogin(
+            user.id,
+            undefined, // IP will be captured in API route if needed
+            undefined, // User agent will be captured in API route if needed
+            account?.provider || "oauth"
+          );
+        }
+        return true;
+      }
 
       const existingUser = await getUserById(user.id);
 
       // Prevent sign in without email verification
-      if (!existingUser?.emailVerified) return true;
+      if (!existingUser?.emailVerified) {
+        // Log failed login attempt
+        if (user.id) {
+          await logUserLogin(
+            user.id,
+            undefined,
+            undefined,
+            "credentials_failed"
+          );
+        }
+        return true;
+      }
+
+      // Log successful credentials login
+      if (user.id) {
+        await logUserLogin(
+          user.id,
+          undefined,
+          undefined,
+          "credentials"
+        );
+      }
+
       return true;
     },
     async session({ token, session }) {
@@ -79,14 +114,14 @@ export const {
       token.email = existingUser.email;
       token.role = existingUser.role;
 
-
       return token;
     }
   },
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt",
+  session: { 
+    strategy: "jwt",
     maxAge: 60 * 60,
     updateAge: 24 * 60 * 60, 
-   },
+  },
   ...authConfig,
 });

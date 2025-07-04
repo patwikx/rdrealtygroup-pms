@@ -25,25 +25,27 @@ export async function createUnit(formData: FormData) {
     const creator = users.find(u => u.id === session.user.id);
     const creatorName = creator ? `${creator.firstName} ${creator.lastName}` : 'Unknown user';
 
+    const unitData: any = {
+      propertyId: data.propertyId as string,
+      unitNumber: data.unitNumber as string,
+      unitArea: parseFloat(data.unitArea as string),
+      unitRate: parseFloat(data.unitRate as string),
+      rentAmount: parseFloat(data.rentAmount as string),
+      status: data.status as UnitStatus,
+      // Add new floor-related fields
+      isFirstFloor: data.isFirstFloor === 'true',
+      isSecondFloor: data.isSecondFloor === 'true',
+      isThirdFloor: data.isThirdFloor === 'true',
+      isRoofTop: data.isRoofTop === 'true',
+      isMezzanine: data.isMezzanine === 'true',
+    };
+
+    if (data.propertyTitleId) {
+      unitData.propertyTitleId = data.propertyTitleId as string;
+    }
+
     const unit = await prisma.unit.create({
-      data: {
-        property: {
-          connect: {
-            id: data.propertyId as string
-          }
-        },
-        unitNumber: data.unitNumber as string,
-        unitArea: parseFloat(data.unitArea as string),
-        unitRate: parseFloat(data.unitRate as string),
-        rentAmount: parseFloat(data.rentAmount as string),
-        status: data.status as UnitStatus,
-        // Add new floor-related fields
-        isFirstFloor: data.isFirstFloor === 'true',
-        isSecondFloor: data.isSecondFloor === 'true',
-        isThirdFloor: data.isThirdFloor === 'true',
-        isRoofTop: data.isRoofTop === 'true',
-        isMezzanine: data.isMezzanine === 'true',
-      },
+      data: unitData,
       include: {
         property: true,
       },
@@ -84,6 +86,7 @@ export async function createUnit(formData: FormData) {
     revalidatePath(`/dashboard/properties/${data.propertyId}`);
     return unit;
   } catch (error) {
+    console.error("Error creating unit:", error);
     throw new AppError(
       "Failed to create space. Please try again.",
       500
@@ -107,21 +110,27 @@ export async function updateUnit(id: string, formData: FormData) {
     const updater = users.find(u => u.id === session.user.id);
     const updaterName = updater ? `${updater.firstName} ${updater.lastName}` : 'Unknown user';
 
+    const updateData: any = {
+      unitNumber: data.unitNumber as string,
+      unitArea: parseFloat(data.unitArea as string),
+      unitRate: parseFloat(data.unitRate as string),
+      rentAmount: parseFloat(data.rentAmount as string),
+      status: data.status as UnitStatus,
+      // Add new floor-related fields
+      isFirstFloor: data.isFirstFloor === 'true',
+      isSecondFloor: data.isSecondFloor === 'true',
+      isThirdFloor: data.isThirdFloor === 'true',
+      isRoofTop: data.isRoofTop === 'true',
+      isMezzanine: data.isMezzanine === 'true',
+    };
+
+    if (data.propertyTitleId) {
+      updateData.propertyTitleId = data.propertyTitleId as string;
+    }
+
     const unit = await prisma.unit.update({
       where: { id },
-      data: {
-        unitNumber: data.unitNumber as string,
-        unitArea: parseFloat(data.unitArea as string),
-        unitRate: parseFloat(data.unitRate as string),
-        rentAmount: parseFloat(data.rentAmount as string),
-        status: data.status as UnitStatus,
-        // Add new floor-related fields
-        isFirstFloor: data.isFirstFloor === 'true',
-        isSecondFloor: data.isSecondFloor === 'true',
-        isThirdFloor: data.isThirdFloor === 'true',
-        isRoofTop: data.isRoofTop === 'true',
-        isMezzanine: data.isMezzanine === 'true',
-      },
+      data: updateData,
       include: {
         property: true,
       },
@@ -152,6 +161,7 @@ export async function updateUnit(id: string, formData: FormData) {
     revalidatePath(`/dashboard/properties/${unit.propertyId}`);
     return unit;
   } catch (error) {
+    console.error("Error updating unit:", error);
     throw new AppError(
       "Failed to update space. Please try again.",
       500
@@ -215,6 +225,7 @@ export async function deleteUnit(id: string) {
     revalidatePath(`/dashboard/properties/${unit.propertyId}`);
     return unit;
   } catch (error) {
+    console.error("Error deleting unit:", error);
     throw new AppError(
       "Failed to delete space. Please try again.",
       500

@@ -1,6 +1,6 @@
 'use client';
 
-import { Property, Unit, Document, PropertyUtility, PropertyTax, User } from "@prisma/client";
+import { User } from "@prisma/client";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -77,7 +77,7 @@ export function PropertyList({ initialProperties, users, currentUserId }: Proper
           <Button
             variant="ghost"
             size="sm"
-            className="hidden md:flex"
+            className="hidden md:flex ml-4"
             onClick={() => setSidebarOpen(!sidebarOpen)}
           >
             {sidebarOpen ? (

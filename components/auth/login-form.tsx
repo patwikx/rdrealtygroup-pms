@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import Link from "next/link"
 import { motion } from "framer-motion"
+import { signIn } from "next-auth/react"
 
 import { LoginSchema } from "@/schemas"
 import { Input } from "@/components/ui/input"
@@ -25,6 +26,7 @@ import { login } from "@/actions/login"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Mail, Lock, Loader2 } from "lucide-react"
 import Image from "next/image"
+import { FaGoogle } from "react-icons/fa"
 
 export const LoginForm = () => {
   const searchParams = useSearchParams()
@@ -49,7 +51,7 @@ export const LoginForm = () => {
   const onSubmit = (values: z.infer<typeof LoginSchema>) => {
     setError("")
     setSuccess("")
-    
+
     startTransition(() => {
       login(values, callbackUrl)
         .then((data) => {
@@ -61,6 +63,10 @@ export const LoginForm = () => {
         .catch(() => setError("Something went wrong"))
     })
   }
+
+  const onGoogleClick = () => {
+    signIn("google", { callbackUrl: callbackUrl || "/dashboard" });
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -77,7 +83,7 @@ export const LoginForm = () => {
               transition={{ type: "spring", stiffness: 260, damping: 20 }}
               className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4"
             >
-              <Image src='/assets/rdrdc.webp' alt="rdrdc-logo" width={60} height={60}/>
+              <Image src='/assets/rdrdc.webp' alt="rdrdc-logo" width={60} height={60} />
             </motion.div>
             <h2 className="text-2xl font-bold text-center">RD Realty Group</h2>
             <h2 className="text-xl font-bold text-center">Property Management System</h2>
@@ -185,6 +191,25 @@ export const LoginForm = () => {
                 </Button>
               </form>
             </Form>
+            <div className="relative w-full my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={isPending}
+              onClick={onGoogleClick}
+            >
+              <FaGoogle className="mr-2 h-4 w-4" />
+              Google
+            </Button>
           </CardContent>
           <CardFooter className="flex justify-center">
             <p className="text-sm text-muted-foreground">

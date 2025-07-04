@@ -3,178 +3,173 @@
 import { useCallback, useState } from "react"
 import { DragDropContext } from "@hello-pangea/dnd"
 
-import { useToast } from "@/components/ui/use-toast"
-import { ProjectColumn } from "./project-column"
 import { updateTaskOrder } from "@/actions/project-kanban/tasks"
+import { ProjectColumn } from "./project-column"
+import { useSession } from "next-auth/react"
+import { toast } from "sonner"
 
 interface Task {
-  id: string
-  order: number
-  columnId: string
-  [key: string]: any // For other task properties
+    id: string
+    order: number
+    columnId: string
+    [key: string]: any // For other task properties
 }
 
 interface Column {
-  id: string
-  name: string
-  tasks: Task[]
-  [key: string]: any // For other column properties
+    id: string
+    name: string
+    tasks: Task[]
+    [key: string]: any // For other column properties
 }
 
 interface ProjectBoardProps {
-  project: {
-    id: string
-    boards: {
-      columns: Column[]
-    }[]
-  }
+    project: {
+        id: string
+        boards: {
+            columns: Column[]
+        }[]
+        members: any[]; // Assuming members array contains user roles
+    }
 }
 
 export function ProjectBoard({ project }: ProjectBoardProps) {
-  const [columns, setColumns] = useState<Column[]>(project.boards[0].columns)
-  const { toast } = useToast()
+    const [columns, setColumns] = useState<Column[]>(project.boards[0].columns)
+    const { data: session } = useSession()
 
-  const onDragEnd = useCallback(async (result: any) => {
-    const { destination, source, draggableId } = result
+    const getCurrentUserRole = useCallback(() => {
+        if (!session?.user?.id) return null;
+        const member = project.members.find((m: any) => m.userId === session.user.id);
+        return member?.role;
+    }, [session?.user?.id, project.members]);
 
-    if (!destination) return
+    const onDragEnd = useCallback(async (result: any) => {
+        const { destination, source, draggableId } = result
 
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
-      return
-    }
+        if (!destination) return
 
-    const sourceColumn = columns.find((col) => col.id === source.droppableId)
-    const destColumn = columns.find((col) => col.id === destination.droppableId)
+        if (
+            destination.droppableId === source.droppableId &&
+            destination.index === source.index
+        ) {
+            return
+        }
 
-    if (!sourceColumn || !destColumn) return
+        const userRole = getCurrentUserRole();
+        const sourceColumn = columns.find((col) => col.id === source.droppableId);
+        const destColumn = columns.find((col) => col.id === destination.droppableId);
 
-    if (sourceColumn.id === destColumn.id) {
-      const newTasks = Array.from(sourceColumn.tasks)
-      const [removed] = newTasks.splice(source.index, 1)
-      newTasks.splice(destination.index, 0, removed)
+        if (!sourceColumn || !destColumn) return;
 
-      const newColumn = {
-        ...sourceColumn,
-        tasks: newTasks.map((task, index) => ({ ...task, order: index }))
-      }
+        let isMoveAllowed = false; // Default to not allowed
 
-      setColumns(
-        columns.map((column) =>
-          column.id === newColumn.id ? newColumn : column
+        if (userRole === "OWNER" || userRole === "ADMIN" || userRole === "MANAGER") {
+            isMoveAllowed = true;
+        } else if (userRole === "PURCHASER") {
+            const allowedSourceColumns = ["PR", "Canvass", "CQS for Signature", "For PO", "For Budget", "PO Completed", "Delivered"];
+            const allowedDestinationColumns = ["PR", "Canvass", "CQS for Signature", "For PO", "For Budget", "PO Completed", "Delivered"];
+            if (allowedSourceColumns.includes(sourceColumn.name) && allowedDestinationColumns.includes(destColumn.name)) {
+                isMoveAllowed = true;
+            }
+        } else if (userRole === "TREASURY") {
+            const allowedSourceColumns = ["For Budget", "For Release", "PO for Signature", "Accounting"];
+            const allowedDestinationColumns = ["For Budget", "For Release", "PO for Signature", "Accounting"];
+            if (allowedSourceColumns.includes(sourceColumn.name) && allowedDestinationColumns.includes(destColumn.name)) {
+                isMoveAllowed = true;
+            }
+        } else if (userRole === "ACCTG") {
+            const allowedSourceColumns = ["Accounting"];
+            const allowedDestinationColumns = ["PO Completed"];
+            if (allowedSourceColumns.includes(sourceColumn.name) && allowedDestinationColumns.includes(destColumn.name)) {
+                isMoveAllowed = true;
+            }
+        }
+
+        if (!isMoveAllowed) {
+            toast.error(`You are not authorized to move tasks between "${sourceColumn.name}" and "${destColumn.name}" with your role (${userRole}).`);
+            return; // Prevent further processing
+        }
+
+        const newColumns = [...columns];
+        const sourceColIndex = newColumns.findIndex(col => col.id === source.droppableId);
+        const destColIndex = newColumns.findIndex(col => col.id === destination.droppableId);
+
+        if (sourceColIndex === -1 || destColIndex === -1) return;
+
+        const sourceTasks = Array.from(newColumns[sourceColIndex].tasks);
+        const [removed] = sourceTasks.splice(source.index, 1);
+
+        const destTasks = Array.from(newColumns[destColIndex].tasks);
+        destTasks.splice(destination.index, 0, removed);
+
+        newColumns[sourceColIndex] = { ...newColumns[sourceColIndex], tasks: sourceTasks.map((task, index) => ({ ...task, order: index })) };
+        newColumns[destColIndex] = { ...newColumns[destColIndex], tasks: destTasks.map((task, index) => ({ ...task, order: index })) };
+
+        setColumns(newColumns);
+
+        try {
+            await updateTaskOrder({
+                tasks: [
+                    ...sourceTasks.map((task, index) => ({
+                        id: task.id,
+                        columnId: source.droppableId,
+                        order: index
+                    })),
+                    ...destTasks.map((task, index) => ({
+                        id: task.id,
+                        columnId: destination.droppableId,
+                        order: index
+                    }))
+                ],
+                projectId: project.id
+            });
+        } catch (error) {
+            toast.error("Failed to update task order. Please try again.");
+        }
+    }, [columns, project.id, getCurrentUserRole])
+
+    const handleTaskCreated = useCallback((newTask: Task) => {
+        setColumns(prevColumns =>
+            prevColumns.map(column => {
+                if (column.id === newTask.columnId) {
+                    return {
+                        ...column,
+                        tasks: [...column.tasks, newTask]
+                    }
+                }
+                return column
+            })
         )
-      )
+    }, [])
 
-      try {
-        await updateTaskOrder({
-          tasks: newTasks.map((task, index) => ({
-            id: task.id,
-            columnId: sourceColumn.id,
-            order: index
-          })),
-          projectId: project.id
-        })
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to update task order. Please try again.",
-          variant: "destructive"
-        })
-      }
-    } else {
-      const sourceTasks = Array.from(sourceColumn.tasks)
-      const destTasks = Array.from(destColumn.tasks)
-      const [removed] = sourceTasks.splice(source.index, 1)
-      destTasks.splice(destination.index, 0, removed)
+    const handleTaskEdited = useCallback((newTask: Task) => {
+        setColumns(prevColumns =>
+            prevColumns.map(column => {
+                if (column.id === newTask.columnId) {
+                    return {
+                        ...column,
+                        tasks: [...column.tasks, newTask]
+                    }
+                }
+                return column
+            })
+        )
+    }, [])
 
-      const newSourceColumn = {
-        ...sourceColumn,
-        tasks: sourceTasks.map((task, index) => ({ ...task, order: index }))
-      }
-
-      const newDestColumn = {
-        ...destColumn,
-        tasks: destTasks.map((task, index) => ({ ...task, order: index }))
-      }
-
-      setColumns(
-        columns.map((column) => {
-          if (column.id === newSourceColumn.id) return newSourceColumn
-          if (column.id === newDestColumn.id) return newDestColumn
-          return column
-        })
-      )
-
-      try {
-        await updateTaskOrder({
-          tasks: [
-            ...sourceTasks.map((task, index) => ({
-              id: task.id,
-              columnId: sourceColumn.id,
-              order: index
-            })),
-            ...destTasks.map((task, index) => ({
-              id: task.id,
-              columnId: destColumn.id,
-              order: index
-            }))
-          ],
-          projectId: project.id
-        })
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to update task order. Please try again.",
-          variant: "destructive"
-        })
-      }
-    }
-  }, [columns, project.id, toast])
-
-  const handleTaskCreated = useCallback((newTask: Task) => {
-    setColumns(prevColumns => 
-      prevColumns.map(column => {
-        if (column.id === newTask.columnId) {
-          return {
-            ...column,
-            tasks: [...column.tasks, newTask]
-          }
-        }
-        return column
-      })
-    )
-  }, [])
-  
-  const handleTaskEdited = useCallback((newTask: Task) => {
-    setColumns(prevColumns => 
-      prevColumns.map(column => {
-        if (column.id === newTask.columnId) {
-          return {
-            ...column,
-            tasks: [...column.tasks, newTask]
-          }
-        }
-        return column
-      })
-    )
-  }, [])
-
-  return (
-    <div className="flex-1 overflow-auto bg-muted/20 p-4">
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="container flex h-full gap-4">
-          {columns.map((column) => (
-            <ProjectColumn
-              key={column.id}
-              column={column}
-              projectId={project.id}
-              onTaskCreated={handleTaskCreated}
-            />
-          ))}
+    return (
+        <div className="flex-1 overflow-auto bg-muted/20 p-4">
+            <DragDropContext onDragEnd={onDragEnd}>
+                <div className="flex h-full gap-4"> {/* Removed 'container' class */}
+                    {columns.map((column, index) => ( // Get the index here
+                        <ProjectColumn
+                            key={column.id}
+                            column={column}
+                            projectId={project.id}
+                            onTaskCreated={handleTaskCreated}
+                            isFirstColumn={index === 0} // Pass isFirstColumn based on the index
+                        />
+                    ))}
+                </div>
+            </DragDropContext>
         </div>
-      </DragDropContext>
-    </div>
-  )
+    )
 }

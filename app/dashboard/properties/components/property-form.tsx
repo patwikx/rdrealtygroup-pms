@@ -118,45 +118,6 @@ export function PropertyForm() {
                   />
                   <FormField
                     control={form.control}
-                    name="titleNo"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Title Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter title number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lotNo"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Lot Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter lot number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="registeredOwner"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Registered Owner</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter registered owner" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
                     name="leasableArea"
                     render={({ field }) => (
                       <FormItem>
@@ -197,24 +158,6 @@ export function PropertyForm() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="totalUnits"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Units</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="Enter total units"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value))}
-                          />
-                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

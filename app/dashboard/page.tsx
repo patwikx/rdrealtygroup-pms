@@ -21,6 +21,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { OccupancyTrendChart } from '@/components/occupancy-trend-chart'
+import { calculateOpportunityLoss } from '@/lib/reports/opportunity-loss'
+import { formatCurrency } from '@/lib/utils'
+import { OpportunityLossCard } from '@/components/opportunity-loss-card'
 
 // Server Actions
 async function getOverviewStats() {
@@ -33,7 +37,8 @@ async function getOverviewStats() {
     overduePayments,
     upcomingLeaseRenewals,
     recentMaintenanceRequests,
-    occupancyMetrics
+    occupancyMetrics,
+    opportunityLoss
   ] = await Promise.all([
     prisma.property.count(),
     prisma.unit.count(),
@@ -76,7 +81,7 @@ async function getOverviewStats() {
         tenant: true
       }
     }),
-    // New query to get total leasable area and occupied area
+    // Query to get total leasable area and occupied area
     prisma.$transaction([
       prisma.property.aggregate({
         _sum: {
@@ -91,7 +96,9 @@ async function getOverviewStats() {
           unitArea: true
         }
       })
-    ])
+    ]),
+    // Get opportunity loss data
+    calculateOpportunityLoss()
   ])
 
   const totalLeasableArea = Number(occupancyMetrics[0]._sum.leasableArea) || 0
@@ -107,7 +114,13 @@ async function getOverviewStats() {
     upcomingLeaseRenewals,
     recentMaintenanceRequests,
     totalLeasableArea,
-    totalOccupiedArea
+    totalOccupiedArea,
+    opportunityLoss: {
+      vacantUnits: opportunityLoss.summary.totalVacantUnits,
+      vacantArea: opportunityLoss.summary.totalVacantArea,
+      monthlyLoss: opportunityLoss.summary.totalMonthlyLoss,
+      annualLoss: opportunityLoss.summary.totalAnnualLoss
+    }
   }
 }
 
@@ -156,6 +169,50 @@ async function getRevenueMetrics() {
     lastMonthRevenue: lastMonthRevenue._sum.amount || 0,
     totalOutstandingAmount: totalOutstandingAmount._sum.amount || 0
   }
+}
+
+async function getOccupancyTrends() {
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    return date;
+  }).reverse();
+
+  const occupancyData = await Promise.all(
+    months.map(async (date) => {
+      const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+      const [occupiedUnits, vacantUnits] = await Promise.all([
+        // Get occupied units count
+        prisma.unit.count({
+          where: {
+            status: 'OCCUPIED',
+            createdAt: {
+              lte: endOfMonth
+            }
+          }
+        }),
+        // Get vacant units count
+        prisma.unit.count({
+          where: {
+            status: 'VACANT',
+            createdAt: {
+              lte: endOfMonth
+            }
+          }
+        })
+      ]);
+
+      return {
+        month: date.toLocaleString('default', { month: 'short' }),
+        occupied: occupiedUnits,
+        vacant: vacantUnits,
+        total: occupiedUnits + vacantUnits
+      };
+    })
+  );
+
+  return occupancyData;
 }
 
 function StatCard({ 
@@ -250,6 +307,7 @@ function MaintenanceRequestTable({ requests }: { requests: any[] }) {
 export default async function DashboardPage() {
   const stats = await getOverviewStats()
   const revenue = await getRevenueMetrics()
+  const occupancyTrends = await getOccupancyTrends()
   
   const revenueChange = revenue.currentMonthRevenue > revenue.lastMonthRevenue
   const revenueChangePercentage = revenue.lastMonthRevenue 
@@ -265,16 +323,13 @@ export default async function DashboardPage() {
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-        <div className="flex items-center space-x-2">
-          <Button>Download Report</Button>
-        </div>
       </div>
       
-       {/* Revenue Overview */}
-       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Revenue Overview */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Outstanding Payments"
-          value={`₱${revenue.totalOutstandingAmount.toLocaleString()}`}
+          value={formatCurrency(revenue.totalOutstandingAmount)}
           icon={AlertTriangle}
           description={`${stats.overduePayments} overdue payments`}
         />
@@ -284,18 +339,14 @@ export default async function DashboardPage() {
           icon={Building2}
           description={`${stats.totalUnits} total spaces`}
         />
+        
         <StatCard
           title="Occupancy Rate"
           value={`${occupancyRate}%`}
           icon={Home}
           description={`${stats.totalOccupiedArea} / ${stats.totalLeasableArea} sqm occupied`}
         />
-        <StatCard
-          title="New Tenants"
-          value={stats.totalTenants}
-          icon={Users}
-          description="New tenants"
-        />
+        <OpportunityLossCard summary={stats.opportunityLoss} />
       </div>
 
       {/* Key Metrics */}
@@ -318,29 +369,23 @@ export default async function DashboardPage() {
           icon={ClipboardList}
           description="Next 30 days"
         />
-
         <StatCard
-          title="Upcoming Tenant Anniversaries"
+          title="Tenant Anniversaries"
           value={stats.upcomingLeaseRenewals}
           icon={PartyPopper}
           description="Next 30 days"
         />
       </div>
 
-      {/* Recent Maintenance Requests */}
-      <Card className="col-span-4">
-        <CardHeader>
-          <CardTitle>Recent Maintenance Requests</CardTitle>
-          <CardDescription>
-            Latest maintenance requests across all properties
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Suspense fallback={<div>Loading...</div>}>
-            <MaintenanceRequestTable requests={stats.recentMaintenanceRequests} />
-          </Suspense>
-        </CardContent>
-      </Card>
+      {/* Occupancy Trend Chart */}
+      <OccupancyTrendChart 
+        data={occupancyTrends.map(trend => ({
+          month: trend.month,
+          total: trend.total,
+          occupied: trend.occupied,
+          vacant: trend.total - trend.occupied
+        }))}
+      />
     </div>
   )
 }

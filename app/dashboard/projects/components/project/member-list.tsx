@@ -110,9 +110,9 @@ export function MemberList({
                     <Shield className="mr-2 h-4 w-4" />
                     Make Admin
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onUpdateRole(member.user.id, "MEMBER")}>
+                  <DropdownMenuItem onClick={() => onUpdateRole(member.user.id, "Purchaser")}>
                     <Shield className="mr-2 h-4 w-4" />
-                    Make Member
+                    Make Purchaser
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onUpdateRole(member.user.id, "VIEWER")}>
                     <Shield className="mr-2 h-4 w-4" />

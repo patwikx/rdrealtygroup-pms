@@ -24,11 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAsync } from "@/hooks/use-async";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { z } from "zod";
 import { createTenant } from "@/actions/tenants";
+import { User, Building2, AlertCircle, Upload, UserPlus, Badge } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { TenantCSVImport } from "./tenants-csv-import";
 
 type TenantFormValues = z.infer<typeof tenantSchema>;
@@ -40,7 +42,6 @@ const defaultValues: Partial<TenantFormValues> = {
 export function TenantForm() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("form");
-  const { toast } = useToast();
 
   const form = useForm<TenantFormValues>({
     resolver: zodResolver(tenantSchema),
@@ -62,196 +63,297 @@ export function TenantForm() {
     },
     {
       onSuccess: () => {
-        toast({
-          title: "Success",
-          description: "Tenant has been created successfully.",
-        });
+        toast.success("Tenant has been created successfully.");
       },
       onError: (error) => {
-        toast({
-          title: "Error",
-          description: error.message || "Something went wrong. Please try again.",
-          variant: "destructive",
-        });
+        toast.error(error.message || "Something went wrong. Please try again.");
       },
     }
   );
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList>
-        <TabsTrigger value="form">Single Tenant</TabsTrigger>
-        <TabsTrigger value="import">Bulk Import</TabsTrigger>
-      </TabsList>
-      <TabsContent value="form">
-        <Card>
-          <CardContent className="pt-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(submitForm)} className="space-y-8">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="bpCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>BP Code</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter BP code" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {Object.values(TenantStatus).map((status) => (
-                              <SelectItem key={status} value={status}>
-                                {status.charAt(0) + status.slice(1).toLowerCase()}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter first name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter last name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="email" 
-                            placeholder="Enter email address" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter phone number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="company"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter company name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+    <div className="space-y-4 p-4 bg-gradient-to-br from-slate-50 via-white to-slate-50 min-h-screen">
+      {/* Header Section */}
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Emergency Contact</h3>
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="emergencyContactName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contact Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter contact name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="emergencyContactPhone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contact Phone</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter contact phone" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="bg-white border border-slate-200 p-1 rounded-lg shadow-sm">
+          <TabsTrigger 
+            value="form" 
+            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Single Tenant
+          </TabsTrigger>
+          <TabsTrigger 
+            value="import" 
+            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Bulk Import
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="form" className="space-y-6">
+          <Card className="bg-white border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+              <CardTitle className="flex items-center gap-3 text-slate-900">
+                <User className="h-6 w-6 text-slate-600" />
+                Tenant Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-8">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(submitForm)} className="space-y-8">
+                  {/* Basic Information Section */}
+                  <div className="space-y-6">
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="bpCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">
+                              BP Code <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter BP code" 
+                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">
+                              Status <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent className="bg-white border-slate-200">
+                                {Object.values(TenantStatus).map((status) => (
+                                  <SelectItem key={status} value={status}>
+                                    {status.charAt(0) + status.slice(1).toLowerCase()}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">
+                              First Name <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter first name" 
+                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">
+                              Last Name <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter last name" 
+                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">
+                              Email <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="email" 
+                                placeholder="Enter email address" 
+                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">
+                              Phone <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter phone number" 
+                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex justify-end space-x-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.push("/dashboard/tenants")}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Creating..." : "Create Tenant"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      </TabsContent>
-      <TabsContent value="import">
-        <TenantCSVImport />
-      </TabsContent>
-    </Tabs>
+                  {/* Company Information Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center space-x-2">
+                      <Building2 className="h-5 w-5 text-slate-600" />
+                      <h3 className="text-lg font-semibold text-slate-900">Company Information</h3>
+                    </div>
+                    <Separator className="bg-slate-200" />
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="company"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">
+                              Company Name <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter company name" 
+                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="businessName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">Business Name</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter business name" 
+                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Emergency Contact Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle className="h-5 w-5 text-slate-600" />
+                      <h3 className="text-lg font-semibold text-slate-900">Emergency Contact</h3>
+                    </div>
+                    <Separator className="bg-slate-200" />
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="emergencyContactName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">Contact Name</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter contact name" 
+                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="emergencyContactPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">Contact Phone</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter contact phone" 
+                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-4 pt-6 border-t border-slate-100">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => router.push("/dashboard/tenants")}
+                      className="border-slate-300 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={isSubmitting}
+                      className="min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {isSubmitting ? "Creating..." : "Create Tenant"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="import">
+          <TenantCSVImport />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

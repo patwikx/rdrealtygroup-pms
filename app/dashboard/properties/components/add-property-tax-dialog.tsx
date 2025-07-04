@@ -45,6 +45,7 @@ import { User } from "@prisma/client";
 import { Textarea } from "@/components/ui/textarea";
 
 const propertyTaxFormSchema = z.object({
+  propertyTitleId: z.string().min(1, "Property title is required"),
   taxYear: z.number().min(2000, "Valid tax year is required"),
   taxDecNo: z.string().min(1, "Tax declaration number is required"),
   taxAmount: z.number().positive("Tax amount must be positive"),
@@ -60,13 +61,20 @@ const propertyTaxFormSchema = z.object({
 
 type PropertyTaxFormValues = z.infer<typeof propertyTaxFormSchema>;
 
+interface PropertyTitle {
+  id: string;
+  titleNo: string;
+  lotNo: string;
+  registeredOwner: string;
+}
+
 interface AddPropertyTaxDialogProps {
-  propertyId: string;
+  propertyTitles: PropertyTitle[];
   users: User[];
   currentUserId: string;
 }
 
-export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPropertyTaxDialogProps) {
+export function AddPropertyTaxDialog({ propertyTitles, users, currentUserId }: AddPropertyTaxDialogProps) {
   const [open, setOpen] = useState(false);
   const form = useForm<PropertyTaxFormValues>({
     resolver: zodResolver(propertyTaxFormSchema),
@@ -81,7 +89,7 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
     async (data: PropertyTaxFormValues) => {
       try {
         const formData = new FormData();
-        formData.append("propertyId", propertyId);
+        formData.append("propertyTitleId", data.propertyTitleId);
         formData.append("taxYear", data.taxYear.toString());
         formData.append("taxDecNo", data.taxDecNo);
         formData.append("taxAmount", data.taxAmount.toString());
@@ -115,28 +123,56 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
           <Plus className="h-4 w-4 mr-2" />
           Add Property Tax
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add Property Tax Record</DialogTitle>
+      <DialogContent className="sm:max-w-[500px] bg-white border-slate-200">
+        <DialogHeader className="pb-4 border-b border-slate-100">
+          <DialogTitle className="text-xl font-semibold text-slate-900">Add Property Tax Record</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(submitForm)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(submitForm)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="propertyTitleId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-medium text-slate-700">Property Title</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
+                        <SelectValue placeholder="Select property title" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="bg-white border-slate-200">
+                      {propertyTitles.map((title) => (
+                        <SelectItem key={title.id} value={title.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{title.registeredOwner} — {title.titleNo} - Lot {title.lotNo}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="taxYear"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tax Year</FormLabel>
+                    <FormLabel className="font-medium text-slate-700">Tax Year</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
                         min="2000" 
+                        className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
                         {...field}
                         onChange={(e) => field.onChange(parseInt(e.target.value))}
                       />
@@ -150,9 +186,12 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
                 name="taxDecNo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tax Declaration No.</FormLabel>
+                    <FormLabel className="font-medium text-slate-700">Tax Declaration No.</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input 
+                        className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -165,11 +204,12 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
               name="taxAmount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tax Amount (₱)</FormLabel>
+                  <FormLabel className="font-medium text-slate-700">Tax Amount (₱)</FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 
                       step="0.01" 
+                      className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
                       {...field}
                       onChange={(e) => field.onChange(parseFloat(e.target.value))}
                     />
@@ -179,12 +219,12 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
               )}
             />
 
-            <div className="flex space-x-4">
+            <div className="flex space-x-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
               <FormField
                 control={form.control}
                 name="isAnnual"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-x-2">
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
                     <FormControl>
                       <Checkbox
                         checked={field.value}
@@ -197,7 +237,7 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
                         }}
                       />
                     </FormControl>
-                    <FormLabel className="font-normal">Annual</FormLabel>
+                    <FormLabel className="font-medium text-slate-700">Annual Payment</FormLabel>
                   </FormItem>
                 )}
               />
@@ -206,7 +246,7 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
                 control={form.control}
                 name="isQuarterly"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-x-2">
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
                     <FormControl>
                       <Checkbox
                         checked={field.value}
@@ -214,11 +254,13 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
                           field.onChange(checked);
                           if (checked) {
                             form.setValue("isAnnual", false);
+                          } else {
+                            form.setValue("whatQuarter", undefined);
                           }
                         }}
                       />
                     </FormControl>
-                    <FormLabel className="font-normal">Quarterly</FormLabel>
+                    <FormLabel className="font-medium text-slate-700">Quarterly Payment</FormLabel>
                   </FormItem>
                 )}
               />
@@ -230,14 +272,14 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
                 name="whatQuarter"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quarter</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel className="font-medium text-slate-700">Quarter</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
                           <SelectValue placeholder="Select quarter" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className="bg-white border-slate-200">
                         <SelectItem value="1st Quarter">1st Quarter</SelectItem>
                         <SelectItem value="2nd Quarter">2nd Quarter</SelectItem>
                         <SelectItem value="3rd Quarter">3rd Quarter</SelectItem>
@@ -255,14 +297,14 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
               name="dueDate"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Due Date</FormLabel>
+                  <FormLabel className="font-medium text-slate-700">Due Date</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
                           variant={"outline"}
                           className={cn(
-                            "w-full pl-3 text-left font-normal",
+                            "w-full pl-3 text-left font-normal border-slate-300 focus:border-blue-500 focus:ring-blue-500/20",
                             !field.value && "text-muted-foreground"
                           )}
                         >
@@ -275,7 +317,7 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto p-0 bg-white border-slate-200" align="start">
                       <Calendar
                         mode="single"
                         selected={field.value}
@@ -297,14 +339,14 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
               name="processedBy"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Processed By</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormLabel className="font-medium text-slate-700">Processed By (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
                         <SelectValue placeholder="Select user" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border-slate-200">
                       {users.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.firstName} {user.lastName}
@@ -322,25 +364,36 @@ export function AddPropertyTaxDialog({ propertyId, users, currentUserId }: AddPr
               name="remarks"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Remarks</FormLabel>
+                  <FormLabel className="font-medium text-slate-700">Remarks (Optional)</FormLabel>
                   <FormControl>
-                    <Textarea {...field} />
+                    <Textarea 
+                      className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                      {...field} 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="flex justify-end space-x-4 pt-4">
+            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false);
+                  form.reset();
+                }}
                 disabled={isSubmitting}
+                className="border-slate-300 hover:bg-slate-50"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white"
+              >
                 {isSubmitting ? "Adding..." : "Add Tax Record"}
               </Button>
             </div>

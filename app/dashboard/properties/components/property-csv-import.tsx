@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -18,7 +18,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Download, Upload } from "lucide-react";
 import { importPropertiesFromCSV } from "@/actions/property";
 
-
 export function CSVImport() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
@@ -28,76 +27,131 @@ export function CSVImport() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.name.endsWith('.csv')) {
+        toast.error('Please upload a CSV file');
+        return;
+      }
+
       setFile(file);
       const reader = new FileReader();
       reader.onload = (e) => {
-        const text = e.target?.result as string;
-        const [headers, ...rows] = text.split('\n').map(row => row.trim()).filter(Boolean);
-        const headerArray = headers.split(',').map(h => h.trim());
-        const data = rows
-          .filter(row => row.length > 0)
-          .map(row => {
-            const values = row.split(',').map(v => v.trim());
-            return headerArray.reduce((obj, header, i) => {
-              obj[header] = values[i];
-              return obj;
-            }, {} as any);
-          });
-        setPreview(data.slice(0, 5));
+        try {
+          const text = e.target?.result as string;
+          const [headers, ...rows] = text.split('\n').map(row => row.trim()).filter(Boolean);
+          
+          if (!headers) {
+            toast.error('The CSV file appears to be empty');
+            setFile(null);
+            return;
+          }
+
+          const headerArray = headers.split(',').map(h => h.trim());
+          const requiredHeaders = [
+        "propertyName",
+        "propertyCode",
+        "leasableArea",
+        "address",
+        "propertyType"
+          ];
+
+          const missingHeaders = requiredHeaders.filter(h => !headerArray.includes(h));
+          if (missingHeaders.length > 0) {
+            toast.error(`Missing required columns: ${missingHeaders.join(', ')}`);
+            setFile(null);
+            return;
+          }
+
+          const data = rows
+            .filter(row => row.length > 0)
+            .map(row => {
+              const values = row.split(',').map(v => v.trim());
+              return headerArray.reduce((obj, header, i) => {
+                obj[header] = values[i];
+                return obj;
+              }, {} as any);
+            });
+
+          if (data.length === 0) {
+            toast.error('No data found in the CSV file');
+            setFile(null);
+            return;
+          }
+
+          setPreview(data.slice(0, 5));
+          toast.success('CSV file loaded successfully');
+        } catch (error) {
+          console.error('CSV parsing error:', error);
+          toast.error('Failed to parse CSV file. Please check the format');
+          setFile(null);
+          setPreview([]);
+        }
       };
+
+      reader.onerror = () => {
+        toast.error('Failed to read the file');
+        setFile(null);
+        setPreview([]);
+      };
+
       reader.readAsText(file);
     }
   };
 
   const handleImport = async () => {
-    if (!file) return;
+    if (!file) {
+      toast.error('Please select a file first');
+      return;
+    }
+
+    setIsLoading(true);
+    const formData = new FormData();
+    formData.append('file', file);
 
     try {
-      setIsLoading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-
       await importPropertiesFromCSV(formData);
-
-      toast({
-        title: "Success",
-        description: "Properties have been imported successfully.",
-      });
+      toast.success('Properties imported successfully');
       router.refresh();
       setFile(null);
       setPreview([]);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message.includes('duplicate property codes')) {
+        toast.error('Import partially completed', {
+          description: error.message,
+          duration: 5000,
+        });
+      } else {
+        toast.error('Failed to import properties', {
+          description: 'Please check your CSV file and try again',
+        });
+      }
       console.error('Import error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to import properties. Please check your CSV file and try again.",
-        variant: "destructive",
-      });
     } finally {
       setIsLoading(false);
     }
   };
 
   const downloadTemplate = () => {
-    const headers = [
-      "propertyName",
-      "propertyCode",
-      "titleNo",
-      "lotNo",
-      "registeredOwner",
-      "leasableArea",
-      "address",
-      "propertyType",
-      "totalUnits"
-    ].join(',');
-    
-    const blob = new Blob([headers], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'property-import-template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    try {
+      const headers = [
+        "propertyName",
+        "propertyCode",
+        "leasableArea",
+        "address",
+        "propertyType"
+      ].join(',');
+      
+      const blob = new Blob([headers], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'property-import-template.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Template downloaded successfully');
+    } catch (error) {
+      toast.error('Failed to download template');
+    }
   };
 
   return (

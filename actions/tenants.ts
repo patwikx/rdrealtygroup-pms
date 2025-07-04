@@ -117,6 +117,7 @@ export async function createTenant(formData: FormData) {
         email: formData.get('email') as string,
         phone: formData.get('phone') as string,
         company: formData.get('company') as string,
+        businessName: formData.get('businessName') as string || null,
         status: formData.get('status') as TenantStatus,
         emergencyContactName: formData.get('emergencyContactName') as string || null,
         emergencyContactPhone: formData.get('emergencyContactPhone') as string || null,

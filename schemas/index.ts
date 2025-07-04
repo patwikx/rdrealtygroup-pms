@@ -68,7 +68,7 @@ export const RegisterUserSchema = z.object({
   }),
   address: z.string().optional(),
   contactNo: z.string().optional(),
-  role: z.enum([UserRole.ADMIN, UserRole.STAFF, UserRole.MANAGER, UserRole.TENANT]).optional(),
+  role: z.enum([UserRole.ADMIN, UserRole.STAFF, UserRole.MANAGER, UserRole.TENANT, UserRole.ACCTG, UserRole.TREASURY, UserRole.STOCKROOM, UserRole.PURCHASER, UserRole.OWNER]).optional(),
 });
 
 export const unitTaxSchema = z.object({

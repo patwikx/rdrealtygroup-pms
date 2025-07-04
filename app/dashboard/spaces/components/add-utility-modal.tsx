@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { utilityAccountSchema } from "@/lib/validations/unit-utility";
 import { createUtilityAccount } from "@/lib/data/unit-utility";
+import { Textarea } from "@/components/ui/textarea";
 
 interface AddUtilityModalProps {
   unitId: string;
@@ -48,6 +49,8 @@ export function AddUtilityModal({ unitId, onSuccess }: AddUtilityModalProps) {
       utilityType: undefined,
       accountNumber: "",
       meterNumber: "",
+      billingId: "",
+      remarks: "",
     },
   });
 
@@ -120,6 +123,19 @@ export function AddUtilityModal({ unitId, onSuccess }: AddUtilityModalProps) {
                 </FormItem>
               )}
             />
+                        <FormField
+              control={form.control}
+              name="billingId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Billing ID</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="meterNumber"
@@ -135,7 +151,22 @@ export function AddUtilityModal({ unitId, onSuccess }: AddUtilityModalProps) {
                   <FormMessage />
                 </FormItem>
               )}
-            />
+            />            <FormField
+            control={form.control}
+            name="remarks"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Remarks</FormLabel>
+                <FormControl>
+                  <Textarea {...field} />
+                </FormControl>
+                <FormDescription>
+                  Leave blank if no remarks are needed.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel

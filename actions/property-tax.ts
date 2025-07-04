@@ -25,11 +25,23 @@ export async function createPropertyTax(formData: FormData) {
     const creator = users.find(u => u.id === session.user.id);
     const creatorName = creator ? `${creator.firstName} ${creator.lastName}` : 'Unknown user';
 
+    // Get the property title and property info for notifications
+    const propertyTitle = await prisma.propertyTitles.findUnique({
+      where: { id: data.propertyTitleId as string },
+      include: {
+        property: true
+      }
+    });
+
+    if (!propertyTitle) {
+      throw new AppError("Property title not found", 404);
+    }
+
     const propertyTax = await prisma.propertyTax.create({
       data: {
-        property: {
+        propertyTitle: {
           connect: {
-            id: data.propertyId as string
+            id: data.propertyTitleId as string
           }
         },
         taxYear: parseInt(data.taxYear as string),
@@ -38,12 +50,17 @@ export async function createPropertyTax(formData: FormData) {
         dueDate: new Date(data.dueDate as string),
         isAnnual: data.isAnnual === "true",
         isQuarterly: data.isQuarterly === "true",
-        whatQuarter: data.whatQuarter as string,
-        processedBy: data.processedBy as string,
-        remarks: data.remarks as string,
+        whatQuarter: data.whatQuarter as string || null,
+        processedBy: data.processedBy as string || null,
+        remarks: data.remarks as string || null,
+        markedAsPaidBy: data.markedAsPaidBy as string,
       },
       include: {
-        property: true,
+        propertyTitle: {
+          include: {
+            property: true
+          }
+        },
       },
     });
 
@@ -60,18 +77,19 @@ export async function createPropertyTax(formData: FormData) {
         createNotification({
           userId: user.id,
           title: "Property Tax Record Added",
-          message: `Property tax record for ${propertyTax.property.propertyName} (${propertyTax.taxYear}) has been added by ${creatorName}`,
+          message: `Property tax record for ${propertyTitle.property.propertyName} - Title ${propertyTitle.titleNo} (${propertyTax.taxYear}) has been added by ${creatorName}`,
           type: NotificationType.TAX,
           entityId: propertyTax.id,
           entityType: EntityType.PROPERTY_TAX,
-          actionUrl: `/dashboard/properties?selected=${data.propertyId}`,
+          actionUrl: `/dashboard/properties/${propertyTitle.propertyId}`,
         })
       )
     );
 
-    revalidatePath(`/dashboard/properties?selected=${data.propertyId}`);
+    revalidatePath(`/dashboard/properties/${propertyTitle.propertyId}`);
     return propertyTax;
   } catch (error) {
+    console.error("Error creating property tax:", error);
     throw new AppError(
       "Failed to create property tax record. Please try again.",
       500
@@ -106,12 +124,16 @@ export async function updatePropertyTax(id: string, formData: FormData) {
         paidDate: data.isPaid === "true" ? new Date() : null,
         isAnnual: data.isAnnual === "true",
         isQuarterly: data.isQuarterly === "true",
-        whatQuarter: data.whatQuarter as string,
-        processedBy: data.processedBy as string,
-        remarks: data.remarks as string,
+        whatQuarter: data.whatQuarter as string || null,
+        processedBy: data.processedBy as string || null,
+        remarks: data.remarks as string || null,
       },
       include: {
-        property: true,
+        propertyTitle: {
+          include: {
+            property: true
+          }
+        },
       },
     });
 
@@ -128,18 +150,19 @@ export async function updatePropertyTax(id: string, formData: FormData) {
         createNotification({
           userId: user.id,
           title: "Property Tax Record Updated",
-          message: `Property tax record for ${propertyTax.property.propertyName} (${propertyTax.taxYear}) has been updated by ${updaterName}`,
+          message: `Property tax record for ${propertyTax.propertyTitle.property.propertyName} - Title ${propertyTax.propertyTitle.titleNo} (${propertyTax.taxYear}) has been updated by ${updaterName}`,
           type: NotificationType.TAX,
           entityId: propertyTax.id,
           entityType: EntityType.PROPERTY_TAX,
-          actionUrl: `/dashboard/properties?selected=${propertyTax.propertyId}`,
+          actionUrl: `/dashboard/properties/${propertyTax.propertyTitle.propertyId}`,
         })
       )
     );
 
-    revalidatePath(`/dashboard/properties?selected=${propertyTax.propertyId}`);
+    revalidatePath(`/dashboard/properties/${propertyTax.propertyTitle.propertyId}`);
     return propertyTax;
   } catch (error) {
+    console.error("Error updating property tax:", error);
     throw new AppError(
       "Failed to update property tax record. Please try again.",
       500
@@ -164,7 +187,11 @@ export async function deletePropertyTax(id: string) {
     const propertyTax = await prisma.propertyTax.delete({
       where: { id },
       include: {
-        property: true,
+        propertyTitle: {
+          include: {
+            property: true
+          }
+        },
       },
     });
 
@@ -180,19 +207,20 @@ export async function deletePropertyTax(id: string) {
         createNotification({
           userId: user.id,
           title: "Property Tax Record Deleted",
-          message: `Property tax record for ${propertyTax.property.propertyName} (${propertyTax.taxYear}) has been deleted by ${deleterName}`,
+          message: `Property tax record for ${propertyTax.propertyTitle.property.propertyName} - Title ${propertyTax.propertyTitle.titleNo} (${propertyTax.taxYear}) has been deleted by ${deleterName}`,
           type: NotificationType.TAX,
           priority: "HIGH",
           entityId: propertyTax.id,
           entityType: EntityType.PROPERTY_TAX,
-          actionUrl: `/dashboard/properties?selected=${propertyTax.propertyId}`,
+          actionUrl: `/dashboard/properties/${propertyTax.propertyTitle.propertyId}`,
         })
       )
     );
 
-    revalidatePath(`/dashboard/properties?selected=${propertyTax.propertyId}`);
+    revalidatePath(`/dashboard/properties/${propertyTax.propertyTitle.propertyId}`);
     return propertyTax;
   } catch (error) {
+    console.error("Error deleting property tax:", error);
     throw new AppError(
       "Failed to delete property tax record. Please try again.",
       500
@@ -201,35 +229,92 @@ export async function deletePropertyTax(id: string) {
 }
 
 export async function updatePropertyTaxStatus(id: string, isPaid: boolean) {
-  const tax = await prisma.propertyTax.update({
-    where: { id },
-    data: {
-      isPaid,
-      paidDate: isPaid ? new Date() : null,
-    },
-  });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new AppError("Unauthorized", 401);
+  }
 
-  revalidatePath(`/dashboard/property/${tax.propertyId}`);
-  return tax;
+  try {
+    const tax = await prisma.propertyTax.update({
+      where: { id },
+      data: {
+        isPaid,
+        paidDate: isPaid ? new Date() : null,
+      },
+      include: {
+        propertyTitle: {
+          include: {
+            property: true
+          }
+        }
+      }
+    });
+
+    await createAuditLog({
+      entityId: tax.id,
+      entityType: EntityType.PROPERTY_TAX,
+      action: "UPDATE",
+      changes: { isPaid, paidDate: isPaid ? new Date() : null },
+    });
+
+    revalidatePath(`/dashboard/properties/${tax.propertyTitle.propertyId}`);
+    return tax;
+  } catch (error) {
+    console.error("Error updating property tax status:", error);
+    throw new AppError("Failed to update property tax status. Please try again.", 500);
+  }
 }
 
 export async function updateUtilityStatus(id: string, isActive: boolean) {
-  const utility = await prisma.propertyUtility.update({
-    where: { id },
-    data: {
-      isActive,
-    },
-  });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new AppError("Unauthorized", 401);
+  }
 
-  revalidatePath(`/dashboard/property/${utility.propertyId}`);
-  return utility;
+  try {
+    const utility = await prisma.propertyUtility.update({
+      where: { id },
+      data: {
+        isActive,
+      },
+    });
+
+    await createAuditLog({
+      entityId: utility.id,
+      entityType: EntityType.UTILITY_BILL,
+      action: "UPDATE",
+      changes: { isActive },
+    });
+
+    revalidatePath(`/dashboard/properties/${utility.propertyId}`);
+    return utility;
+  } catch (error) {
+    console.error("Error updating utility status:", error);
+    throw new AppError("Failed to update utility status. Please try again.", 500);
+  }
 }
 
 export async function deletePropertyUtility(id: string) {
-  const utility = await prisma.propertyUtility.delete({
-    where: { id },
-  });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new AppError("Unauthorized", 401);
+  }
 
-  revalidatePath(`/dashboard/property/${utility.propertyId}`);
-  return utility;
+  try {
+    const utility = await prisma.propertyUtility.delete({
+      where: { id },
+    });
+
+    await createAuditLog({
+      entityId: utility.id,
+      entityType: EntityType.UTILITY_BILL,
+      action: "DELETE",
+    });
+
+    revalidatePath(`/dashboard/properties/${utility.propertyId}`);
+    return utility;
+  } catch (error) {
+    console.error("Error deleting utility:", error);
+    throw new AppError("Failed to delete utility. Please try again.", 500);
+  }
 }

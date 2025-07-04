@@ -10,11 +10,11 @@ import { TenantList } from "./components/tenants-list";
 
 export default function TenantsPage() {
   return (
-    <div className="h-full flex-1 flex flex-col space-y-8 p-8">
+    <div className="h-full flex-1 flex flex-col space-y-4 p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Tenants</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl font-bold tracking-tight ml-6">Tenants</h2>
+          <p className="text-muted-foreground ml-6">
             Manage and monitor all your tenants in one place
           </p>
         </div>

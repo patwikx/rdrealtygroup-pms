@@ -31,13 +31,15 @@ model User {
   tenant              Tenant?
 
   // Project Management Relations
-  ownedProjects    Project[]        @relation("ProjectOwner")
+  ownedProjects    Project[]               @relation("ProjectOwner")
   memberOfProjects ProjectMember[]
-  assignedTasks    Task[]           @relation("AssignedTasks")
-  createdTasks     Task[]           @relation("CreatedTasks")
+  assignedTasks    Task[]                  @relation("AssignedTasks")
+  createdTasks     Task[]                  @relation("CreatedTasks")
   taskComments     TaskComment[]
   taskAttachments  TaskAttachment[]
   taskActivities   TaskActivity[]
+  titleMovements   PropertyTitleMovement[] // New relation
+  // Property Management Relations
 
   // System Relations
   auditLogs     AuditLog[]
@@ -103,7 +105,7 @@ model ProjectMember {
   id        String      @id @default(cuid())
   projectId String
   userId    String
-  role      ProjectRole @default(MEMBER)
+  role      ProjectRole @default(PURCHASER)
   joinedAt  DateTime    @default(now())
 
   // Relations
@@ -220,68 +222,110 @@ model TaskLabel {
 
 // Property Management Models
 model Property {
-  id              String       @id @default(cuid())
-  propertyCode    String       @unique
-  propertyName    String
-  titleNo         String
-  lotNo           String
-  registeredOwner String
-  leasableArea    Float
-  address         String
-  propertyType    PropertyType
-  totalUnits      Int?         @default(0)
-  createdById     String
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id           String       @id @default(cuid())
+  propertyCode String       @unique
+  propertyName String
+  leasableArea Float
+  address      String
+  propertyType PropertyType
+  totalUnits   Int?         @default(0)
+  createdById  String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   // Relations
-  createdBy     User              @relation("CreatedBy", fields: [createdById], references: [id])
-  units         Unit[]
-  documents     Document[]
-  propertyTaxes PropertyTax[]
-  utilities     PropertyUtility[]
+  createdBy      User                    @relation("CreatedBy", fields: [createdById], references: [id])
+  units          Unit[]
+  documents      Document[]
+  utilities      PropertyUtility[]
+  titleMovements PropertyTitleMovement[]
+  titles         PropertyTitles[] // New one-to-many relation to titles
 }
 
-model PropertyTax {
-  id             String    @id @default(cuid())
-  propertyId     String
-  taxYear        Int
-  TaxDecNo       String
-  taxAmount      Float
-  dueDate        DateTime
-  isPaid         Boolean   @default(false)
-  remarks        String?
-  isAnnual       Boolean   @default(false)
-  isQuarterly    Boolean   @default(false)
-  whatQuarter    String?
-  paidDate       DateTime?
-  processedBy    String?
-  markedAsPaidBy String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+model PropertyTitles {
+  id                 String   @id @default(cuid())
+  propertyId         String
+  titleNo            String   @unique
+  lotNo              String
+  lotArea            Float
+  registeredOwner    String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  isEncumbered       Boolean  @default(false)
+  encumbranceDetails String?
+
+  // RELATIONS
+  property      Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyTaxes PropertyTax[] // Relation to RPTs
+  units         Unit[] // NEW: One-to-many relation to units
+
+  @@index([propertyId])
+}
+
+// New model for tracking property title movements
+model PropertyTitleMovement {
+  id          String              @id @default(cuid())
+  propertyId  String
+  requestedBy String
+  status      TitleMovementStatus
+  location    String
+  purpose     String
+  remarks     String?
+  requestDate DateTime            @default(now())
+  returnDate  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   // Relations
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [requestedBy], references: [id])
+
+  @@index([propertyId])
+  @@index([requestedBy])
+}
+
+model PropertyTax {
+  id              String    @id @default(cuid())
+  propertyTitleId String // Changed from propertyId
+  taxYear         Int
+  TaxDecNo        String
+  taxAmount       Float
+  dueDate         DateTime
+  isPaid          Boolean   @default(false)
+  remarks         String?
+  isAnnual        Boolean   @default(false)
+  isQuarterly     Boolean   @default(false)
+  whatQuarter     String?
+  paidDate        DateTime?
+  processedBy     String?
+  markedAsPaidBy  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  propertyTitle PropertyTitles @relation(fields: [propertyTitleId], references: [id], onDelete: Cascade) // Relation changed to PropertyTitles
 }
 
 model Unit {
-  id            String     @id @default(cuid())
-  propertyId    String
-  unitNumber    String     @unique
-  unitArea      Float
-  unitRate      Float
-  rentAmount    Float
-  isFirstFloor  Boolean    @default(false)
-  isSecondFloor Boolean    @default(false)
-  isThirdFloor  Boolean    @default(false)
-  isRoofTop     Boolean    @default(false)
-  isMezzanine   Boolean    @default(false)
-  status        UnitStatus
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id              String     @id @default(cuid())
+  propertyId      String
+  propertyTitleId String? // Optional relation to PropertyTitles
+  unitNumber      String     @unique
+  unitArea        Float
+  unitRate        Float
+  rentAmount      Float
+  isFirstFloor    Boolean    @default(false)
+  isSecondFloor   Boolean    @default(false)
+  isThirdFloor    Boolean    @default(false)
+  isRoofTop       Boolean    @default(false)
+  isMezzanine     Boolean    @default(false)
+  status          UnitStatus
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   // Relations
   property            Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyTitle       PropertyTitles?      @relation(fields: [propertyTitleId], references: [id], onDelete: SetNull) // NEW: Relation to PropertyTitles
   leases              Lease[]
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
@@ -289,6 +333,7 @@ model Unit {
   utilityAccounts     UnitUtilityAccount[]
 
   @@unique([propertyId, unitNumber])
+  @@index([propertyTitleId]) // NEW: Index for better query performance
 }
 
 model UnitTax {
@@ -335,6 +380,8 @@ model UnitUtilityAccount {
   utilityType   UtilityType
   accountNumber String
   meterNumber   String?
+  remarks       String?
+  billingId     String?
   isActive      Boolean     @default(true)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -374,6 +421,7 @@ model Tenant {
   emergencyContactName  String?
   emergencyContactPhone String?
   company               String
+  businessName          String?
   status                TenantStatus
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
@@ -503,6 +551,13 @@ enum UserRole {
   MANAGER
   STAFF
   TENANT
+  TREASURY
+  PURCHASER
+  ACCTG
+  VIEWER
+  OWNER
+  STOCKROOM
+  MAINTENANCE
 }
 
 enum PropertyType {
@@ -600,7 +655,10 @@ enum ProjectStatus {
 enum ProjectRole {
   OWNER
   ADMIN
-  MEMBER
+  PURCHASER
+  ACCTG
+  TREASURY
+  STOCKROOM
   VIEWER
 }
 
@@ -684,4 +742,13 @@ enum NotificationPriority {
   MEDIUM
   HIGH
   URGENT
+}
+
+// Add new enum for title movement status
+enum TitleMovementStatus {
+  REQUESTED
+  RELEASED
+  RETURNED
+  IN_TRANSIT
+  LOST
 }

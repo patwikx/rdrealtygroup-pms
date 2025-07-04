@@ -29,13 +29,9 @@ export async function createProperty(formData: FormData) {
       data: {
         propertyName: data.propertyName as string,
         propertyCode: data.propertyCode as string,
-        titleNo: data.titleNo as string,
-        lotNo: data.lotNo as string,
-        registeredOwner: data.registeredOwner as string,
         leasableArea: parseFloat(data.leasableArea as string),
         address: data.address as string,
         propertyType: data.propertyType as PropertyType,
-        totalUnits: parseInt(data.totalUnits as string),
         createdById: session.user.id,
       },
     });
@@ -90,13 +86,9 @@ export async function updateProperty(id: string, formData: FormData) {
       data: {
         propertyName: data.propertyName as string,
         propertyCode: data.propertyCode as string,
-        titleNo: data.titleNo as string,
-        lotNo: data.lotNo as string,
-        registeredOwner: data.registeredOwner as string,
         leasableArea: parseFloat(data.leasableArea as string),
         address: data.address as string,
         propertyType: data.propertyType as PropertyType,
-        totalUnits: parseInt(data.totalUnits as string),
       },
     });
 
@@ -288,13 +280,9 @@ export async function importPropertiesFromCSV(formData: FormData) {
       return {
         propertyName: property.propertyName,
         propertyCode: property.propertyCode,
-        titleNo: property.titleNo,
-        lotNo: property.lotNo,
-        registeredOwner: property.registeredOwner,
         leasableArea: parseFloat(property.leasableArea),
         address: property.address,
         propertyType: normalizePropertyType(property.propertyType),
-        totalUnits: parseInt(property.totalUnits),
         createdById: session.user.id,
       };
     } catch (error) {
@@ -306,46 +294,67 @@ export async function importPropertiesFromCSV(formData: FormData) {
     }
   });
 
-  const createdProperties = await prisma.$transaction(
-    properties.map(property => 
-      prisma.property.create({
+  const results = {
+    created: [] as any[],
+    duplicates: [] as string[],
+  };
+
+  // Process each property individually to handle duplicates
+  for (const property of properties) {
+    try {
+      const created = await prisma.property.create({
         data: property
-      })
-    )
-  );
+      });
+      results.created.push(created);
+    } catch (error: any) {
+      // Check if error is due to unique constraint violation
+      if (error.code === 'P2002' && error.meta?.target?.includes('propertyCode')) {
+        results.duplicates.push(property.propertyCode);
+        continue;
+      }
+      throw error;
+    }
+  }
 
-  const users = await prisma.user.findMany({
-    select: { id: true, firstName: true, lastName: true }
-  });
+  if (results.created.length > 0) {
+    const users = await prisma.user.findMany({
+      select: { id: true, firstName: true, lastName: true }
+    });
 
-  const importer = users.find(u => u.id === session.user.id);
-  const importerName = importer ? `${importer.firstName} ${importer.lastName}` : 'Unknown user';
+    const importer = users.find(u => u.id === session.user.id);
+    const importerName = importer ? `${importer.firstName} ${importer.lastName}` : 'Unknown user';
 
-  await Promise.all(
-    createdProperties.map(property => 
-      Promise.all([
-        createAuditLog({
-          entityId: property.id,
-          entityType: EntityType.PROPERTY,
-          action: "CREATE",
-          changes: property,
-          metadata: { source: "CSV_IMPORT" }
-        }),
-        ...users.map(user =>
-          createNotification({
-            userId: user.id,
-            title: "Property Imported",
-            message: `Property "${property.propertyName}" has been imported by ${importerName}`,
-            type: NotificationType.PROPERTY,
+    await Promise.all(
+      results.created.map(property => 
+        Promise.all([
+          createAuditLog({
             entityId: property.id,
             entityType: EntityType.PROPERTY,
-            actionUrl: `/dashboard/properties?selected=${property.id}`,
-          })
-        )
-      ])
-    )
-  );
+            action: "CREATE",
+            changes: property,
+            metadata: { source: "CSV_IMPORT" }
+          }),
+          ...users.map(user =>
+            createNotification({
+              userId: user.id,
+              title: "Property Imported",
+              message: `Property "${property.propertyName}" has been imported by ${importerName}`,
+              type: NotificationType.PROPERTY,
+              entityId: property.id,
+              entityType: EntityType.PROPERTY,
+              actionUrl: `/dashboard/properties?selected=${property.id}`,
+            })
+          )
+        ])
+      )
+    );
+  }
 
   revalidatePath("/dashboard/properties");
-  return createdProperties;
+  
+  if (results.duplicates.length > 0) {
+    throw new Error(`Some properties were not imported due to duplicate property codes: ${results.duplicates.join(', ')}`);
+  }
+
+  return results.created;
 }

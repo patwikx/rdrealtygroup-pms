@@ -19,13 +19,26 @@ import {
 export const propertySchema = z.object({
   propertyCode: z.string().min(1, "Property code is required"),
   propertyName: z.string().min(1, "Property name is required"),
-  titleNo: z.string().min(1, "Title number is required"),
-  lotNo: z.string().min(1, "Lot number is required"),
-  registeredOwner: z.string().min(1, "Registered owner is required"),
   leasableArea: z.number().positive("Leasable area must be positive"),
   address: z.string().min(1, "Address is required"),
   propertyType: z.nativeEnum(PropertyType),
-  totalUnits: z.number().int().nonnegative().optional(),
+});
+
+export const propertyTitleSchema = z.object({
+  titleNo: z.string().min(1, "Title number is required"),
+  lotNo: z.string().min(1, "Lot number is required"),
+  lotArea: z.coerce.number().positive("Lot area must be greater than 0"),
+  registeredOwner: z.string().min(1, "Registered owner is required"),
+  isEncumbered: z.boolean().default(false),
+  encumbranceDetails: z.string().optional(),
+}).refine((data) => {
+  if (data.isEncumbered && !data.encumbranceDetails) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Encumbrance details are required when property is encumbered",
+  path: ["encumbranceDetails"],
 });
 
 export const unitSchema = z.object({
@@ -43,6 +56,7 @@ export const tenantSchema = z.object({
   email: z.string().email("Invalid email address"),
   phone: z.string().min(1, "Phone number is required"),
   company: z.string().min(1, "Company name is required"),
+  businessName: z.string().optional(),
   status: z.nativeEnum(TenantStatus),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),

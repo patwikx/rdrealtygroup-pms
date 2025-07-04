@@ -166,12 +166,18 @@ export function AddLeaseDialog({ tenant, onLeaseCreated }: AddLeaseDialogProps) 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {availableUnits.map((unit) => (
-                        <SelectItem key={unit.id} value={unit.id}>
-                          {unit.property.propertyName} - {unit.unitNumber}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
+  {availableUnits.length > 0 ? (
+    availableUnits.map((unit) => (
+      <SelectItem key={unit.id} value={unit.id}>
+        {unit.property.propertyName} - {unit.unitNumber}
+      </SelectItem>
+    ))
+  ) : (
+    <SelectItem value="no-units" disabled>
+      No available spaces
+    </SelectItem>
+  )}
+</SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>

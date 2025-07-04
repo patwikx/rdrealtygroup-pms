@@ -5,22 +5,41 @@ export const getProperties = cache(async () => {
   return prisma.property.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      units: true,
+      units: {
+        include: {
+          propertyTitle: true, // Include propertyTitle here
+        },
+      },
       documents: true,
       utilities: true,
-      propertyTaxes: true,
+      titleMovements: true,
+      titles: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          propertyTaxes: true, // Include propertyTaxes here
+        },
+      },
     },
   });
 });
-
 export const getPropertyById = cache(async (id: string) => {
   return prisma.property.findUnique({
     where: { id },
     include: {
-      units: true,
+      units: {
+        include: {
+          propertyTitle: true,
+        },
+      },
       documents: true,
       utilities: true,
-      propertyTaxes: true,
+      titleMovements: true,
+      titles: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          propertyTaxes: true,
+        },
+      },
     },
   });
 });

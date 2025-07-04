@@ -31,9 +31,9 @@ export async function createBoard(input: CreateBoardInput) {
         columns: {
           createMany: {
             data: [
-              { name: "To Do", order: 0 },
+              { name: "Pending", order: 0 },
               { name: "In Progress", order: 1 },
-              { name: "Review", order: 2 },
+              { name: "For Approval", order: 2 },
               { name: "Done", order: 3 }
             ]
           }

@@ -185,13 +185,12 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
 
   return (
     <div className="border-b bg-card">
-      <div className="container py-2">
-        <div className="flex items-center justify-between mb-2">
+      <div className="flex justify-start py-2">
+        <div className="flex items-center justify-between mb-2 ml-4">
           <div className="flex items-center gap-2">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
-            </div>
-            <Separator orientation="vertical" className="h-8" />
+            <div className="flex items-center gap-4 rounded-lg border bg-card p-3">
+              <h1 className="text-2xl font-semibold tracking-tight ml-4">{project.name}</h1>
+              <Separator orientation="vertical" className="h-8" />
             <Badge 
               variant="outline" 
               className={`${STATUS_CONFIG[project.status].color} flex items-center gap-1.5 px-2 py-1 h-7`}
@@ -199,36 +198,7 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
               <StatusIcon className="w-4 h-4" />
               {project.status.replace('_', ' ')}
             </Badge>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setMembersDialogOpen(true)}>
-              <Users className="mr-2 h-4 w-4" />
-              Manage Team
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-9 w-9">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Project Actions</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Project Settings
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive" onClick={onDelete}>
-                  <Trash className="mr-2 h-4 w-4" />
-                  Delete Project
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-4 gap-4">
-          <div className="flex items-center gap-4 rounded-lg border bg-card p-3">
+            <Separator orientation="vertical" className="h-8" />
             <div className="flex flex-col">
               <span className="text-xs font-medium text-muted-foreground">Tasks</span>
               <span className="text-2xl font-bold">{totalTasks}</span>
@@ -238,6 +208,17 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
               <span className="text-xs font-medium text-muted-foreground">Completed</span>
               <span className="text-2xl font-bold">{completedTasks}</span>
             </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div className="grid grid-cols-4 gap-4 ml-4">{/** 
+          <div className="flex items-center gap-4 rounded-lg border bg-card p-3">
+
+
+
           </div>
 
           <div className="flex flex-col justify-center rounded-lg border bg-card p-3">
@@ -247,8 +228,8 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
             </div>
             <Progress value={progress} className="h-2" />
           </div>
-
-          <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
+*/}
+           <div className="flex items-center gap-4 rounded-lg border bg-card p-3">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
             <div className="flex flex-col">
               <span className="text-xs font-medium text-muted-foreground">Timeline</span>
@@ -283,6 +264,31 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
               <span className="text-xs font-medium text-muted-foreground">Team</span>
               <span className="text-sm font-medium">{project.members.length} members</span>
             </div>
+            <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setMembersDialogOpen(true)}>
+              <Users className="mr-2 h-4 w-4" />
+              Manage Team
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-9 w-9">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Project Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Project Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                  <Trash className="mr-2 h-4 w-4" />
+                  Delete Project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           </div>
         </div>
       </div>

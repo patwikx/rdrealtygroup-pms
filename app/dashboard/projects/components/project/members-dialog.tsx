@@ -199,7 +199,10 @@ export function MembersDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ADMIN">Admin</SelectItem>
-                    <SelectItem value="MEMBER">Member</SelectItem>
+                    <SelectItem value="PURCHASER">Purchaser</SelectItem>
+                <SelectItem value="ACCTG">Accounting</SelectItem>
+                <SelectItem value="TREASURY">Treasury</SelectItem>
+                <SelectItem value="STOCKROOM">Stockroom</SelectItem>
                     <SelectItem value="VIEWER">Viewer</SelectItem>
                   </SelectContent>
                 </Select>

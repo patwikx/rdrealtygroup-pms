@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache"
 export type AddMemberInput = {
   projectId: string
   userId: string
-  role?: "ADMIN" | "MEMBER" | "VIEWER"
+  role?: "ADMIN" | "PURCHASER" | "VIEWER"
 }
 
 export async function addMember(input: AddMemberInput) {
@@ -21,7 +21,7 @@ export async function addMember(input: AddMemberInput) {
       data: {
         projectId: input.projectId,
         userId: input.userId,
-        role: input.role || "MEMBER"
+        role: input.role || "PURCHASER"
       },
       include: {
         user: {
@@ -45,7 +45,7 @@ export async function addMember(input: AddMemberInput) {
 export type UpdateMemberRoleInput = {
   projectId: string
   userId: string
-  role: "ADMIN" | "MEMBER" | "VIEWER"
+  role: "ADMIN" | "PURCHASER" | "VIEWER"
 }
 
 export async function updateMemberRole(input: UpdateMemberRoleInput) {

@@ -27,6 +27,10 @@ import {
   Eye,
   CheckCircle,
   CalendarIcon,
+  View,
+  ViewIcon,
+  Expand,
+  Loader2,
 } from "lucide-react"
 import { formatDate } from "@/lib/utils/format"
 import React, { useState } from "react"
@@ -35,7 +39,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { updateTask } from "@/actions/project-kanban/tasks"
+import { deleteTask, updateTask } from "@/actions/project-kanban/tasks"
 import { DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -48,6 +52,8 @@ import { format } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { toast } from "sonner"
+import { on } from "events"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 
 interface ProjectTaskProps {
   task: {
@@ -70,6 +76,8 @@ interface ProjectTaskProps {
   }
   index: number
   projectId: string
+  onTaskDeleted?: (taskId: string) => void
+  onTaskEdited?: (task: any) => void
 }
 
 const priorityConfig = {
@@ -114,11 +122,11 @@ const statusConfig = {
   },
 }
 
-export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
+export function ProjectTask({ task, index, projectId, onTaskDeleted, onTaskEdited }: ProjectTaskProps) {
   const [isEditing, setIsEditing] = useState(false)
+  const [isDeleted, setIsDeleted] = useState(false);
   const [loading, setLoading] = useState(false)
   const [date, setDate] = useState<Date | undefined>(task.dueDate ? new Date(task.dueDate) : undefined)
-
 
   const PriorityIcon = priorityConfig[task.priority].icon
   const StatusIcon = statusConfig[task.status].icon
@@ -126,7 +134,7 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
   async function onSubmit(formData: FormData) {
     setLoading(true)
     try {
-      await updateTask(task.id, projectId, {
+      const updatedTask = await updateTask(task.id, projectId, {
         title: formData.get("title") as string,
         description: formData.get("description") as string,
         priority: formData.get("priority") as any,
@@ -135,6 +143,18 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
       })
 
       toast.success("Task updated successfully")
+      
+      // Update parent component state
+      if (onTaskEdited) {
+        onTaskEdited({
+          ...task,
+          title: formData.get("title") as string,
+          description: formData.get("description") as string,
+          priority: formData.get("priority") as any,
+          status: formData.get("status") as any,
+          dueDate: date
+        });
+      }
 
       setIsEditing(false)
     } catch (error) {
@@ -143,6 +163,34 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
       setLoading(false)
     }
   }
+
+  const onDelete = async () => {
+    setLoading(true);
+    try {
+      // Add animation before actually removing the task
+      setIsDeleted(true);
+      
+      // Wait for API call to complete
+      await deleteTask(task.id, projectId);
+      
+      // Wait for animation to complete before updating parent state
+      setTimeout(() => {
+        // Update parent state to remove task from UI
+        if (onTaskDeleted) {
+          onTaskDeleted(task.id);
+        }
+        
+        // Close edit dialog if open
+        setIsEditing(false);
+        
+        toast.success("Task deleted successfully");
+      }, 300); // Match animation duration
+    } catch (error) {
+      setIsDeleted(false); // Revert animation if there's an error
+      toast.error("Something went wrong. Please try again.");
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -155,77 +203,16 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
             className="group relative bg-card p-3 hover:shadow-md transition-all duration-200"
           >
             <div className="space-y-2.5">
-              <div className="flex items-start gap-2">
+                <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1">
-                      <h4 className="font-medium leading-none">{task.title}</h4>
-                      {task.labels && task.labels.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {task.labels.map((label) => (
-                            <Badge
-                              key={label.id}
-                              variant="outline"
-                              className="px-2 py-0.5 text-xs font-normal"
-                              style={{
-                                backgroundColor: `${label.color}15`,
-                                color: label.color,
-                                borderColor: `${label.color}30`,
-                              }}
-                            >
-                              Test
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Task Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
-                          <Trash className="h-4 w-4 mr-2" />
-                          Delete Task
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  {task.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2 break-all overflow-hidden">
-                      {task.description}
-                    </p>
-                  )}
+                  <h4 className="font-bold leading-none">{task.title}</h4>
                 </div>
-              </div>
+                <Button size="icon" variant="ghost" onClick={() => setIsEditing(true)}>
+                  <Expand className="h-4 w-4" />
+                </Button>
+                </div>
 
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Badge
-                  variant="secondary"
-                  className={cn("flex items-center gap-1", priorityConfig[task.priority].color)}
-                >
-                  <PriorityIcon className="h-3 w-3" />
-                  <span>{task.priority}</span>
-                </Badge>
-                {task.dueDate && (
-                  <div className="flex items-center gap-1 text-xs">
-                    <CalendarIcon className="h-3 w-3" />
-                    <span>{formatDate(new Date(task.dueDate))}</span>
-                  </div>
-                )}
-              </div>
+     
 
               <div className="flex items-center justify-between pt-2 border-t border-border/50">
                 <div className="flex items-center gap-3 text-muted-foreground">
@@ -237,8 +224,8 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
                     <Paperclip className="h-3.5 w-3.5" />
                     <span>{task._count?.attachments || 0}</span>
                   </div>
-                </div>
-                {task.assignedTo ? (
+                  <div className="flex items-center gap-1 text-xs">
+                  {task.assignedTo ? (
                   <Avatar className="h-6 w-6 ring-2 ring-background">
                     {task.assignedTo.image ? (
                       <AvatarImage
@@ -259,6 +246,54 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
                     </AvatarFallback>
                   </Avatar>
                 )}
+                  </div>
+                  <div className="flex items-center gap-1 text-xs">
+                  <Badge
+                  variant="secondary"
+                  className={cn("flex items-center gap-1", priorityConfig[task.priority].color)}
+                >
+                  <PriorityIcon className="h-3 w-3" />
+                  <span>{task.priority}</span>
+                </Badge>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs">
+                  {task.dueDate && (
+                  <div className="flex items-center gap-1 text-xs">
+                    <CalendarIcon className="h-3 w-3" />
+                    <span>{formatDate(new Date(task.dueDate))}</span>
+                  </div>
+                )}
+                  </div>
+
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size='icon'><Trash className="w-4 h-4 text-red-500" /></Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                    This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="flex justify-center gap-2">
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={onDelete} className="mt-2"> {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  Continue
+                    </>
+                  )}
+                </AlertDialogAction>
+                  </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                
               </div>
             </div>
           </Card>
@@ -269,8 +304,8 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Edit className="h-5 w-5 text-muted-foreground" />
-              Edit Task
+              <Edit className="font-xl h-5 w-5 text-muted-foreground" />
+              {task.title}
             </DialogTitle>
             <DialogDescription>Make changes to your task here. Click save when you&apos;re done.</DialogDescription>
           </DialogHeader>
@@ -317,34 +352,6 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="status" className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-muted-foreground" />
-                    Status
-                  </Label>
-                  <Select name="status" defaultValue={task.status}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(statusConfig).map(([key, config]) => (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex items-center gap-2">
-                            {React.createElement(config.icon, {
-                              className: `h-4 w-4 ${config.color}`,
-                            })}
-                            {key
-                              .split("_")
-                              .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
-                              .join(" ")}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
                 <Label className="flex items-center gap-2">Due Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -361,6 +368,31 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
                   </PopoverContent>
                 </Popover>
               </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status" className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                  Status
+                </Label>
+                <Select name="status" defaultValue={task.status}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(statusConfig).map(([key, config]) => (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          {React.createElement(config.icon, {
+                            className: `h-4 w-4 ${config.color}`,
+                          })}
+                          {key.replace('_', ' ')}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description" className="flex items-center gap-2">
@@ -372,13 +404,12 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
                   name="description"
                   defaultValue={task.description}
                   className="min-h-[100px] resize-y"
-                  placeholder="Add a more detailed description..."
                 />
               </div>
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t">
-              <Button type="button" variant="destructive" size="sm" className="gap-2">
+              <Button type="button" variant="destructive" size="sm" className="gap-2" onClick={onDelete} disabled={loading}>
                 <Trash className="h-4 w-4" />
                 Delete Task
               </Button>
@@ -407,4 +438,3 @@ export function ProjectTask({ task, index, projectId }: ProjectTaskProps) {
     </>
   )
 }
-
