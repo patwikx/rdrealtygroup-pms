@@ -18,8 +18,10 @@ import { Button } from "@/components/ui/button";
 interface LeaseHistoryProps {
   leases: (Lease & {
     tenant: {
-      firstName: string;
-      lastName: string;
+      firstName: string | null;
+      lastName: string | null;
+      company: string
+      businessName: string
     };
   })[];
 }
@@ -32,12 +34,18 @@ const statusColorMap = {
 };
 
 export function LeaseHistory({ leases }: LeaseHistoryProps) {
+  const getTenantName = (tenant: { firstName: string | null; lastName: string | null }) => {
+    const firstName = tenant.firstName || "";
+    const lastName = tenant.lastName || "";
+    return `${firstName} ${lastName}`.trim() || "Unknown Tenant";
+  };
+
   const handleExportLeasesCSV = () => {
     const csvData = leases.map(lease => ({
-      'Tenant': `${lease.tenant.firstName} ${lease.tenant.lastName}`,
+      'Tenant': getTenantName(lease.tenant),
       'Start Date': format(lease.startDate, "PPP"),
       'End Date': format(lease.endDate, "PPP"),
-      'Rent Amount': Number(lease.rentAmount).toFixed(2),
+      'Rent Amount': Number(lease.totalRentAmount).toFixed(2),
       'Status': lease.status
     }));
 
@@ -90,11 +98,11 @@ export function LeaseHistory({ leases }: LeaseHistoryProps) {
             {leases.map((lease) => (
               <TableRow key={lease.id}>
                 <TableCell>
-                  {lease.tenant.firstName} {lease.tenant.lastName}
+                  {lease.tenant.company}
                 </TableCell>
                 <TableCell>{format(lease.startDate, "PPP")}</TableCell>
                 <TableCell>{format(lease.endDate, "PPP")}</TableCell>
-                <TableCell>{formatCurrency(Number(lease.rentAmount))}</TableCell>
+                <TableCell>{formatCurrency(Number(lease.totalRentAmount))}</TableCell>
                 <TableCell>
                   <Badge
                     variant="secondary"

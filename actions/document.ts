@@ -3,50 +3,47 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { createAuditLog } from "@/lib/audit";
-
-import { EntityType, NotificationType, DocumentType } from "@prisma/client";
-import { AppError } from "@/lib/utils/error";
-import { uploadFile } from "@/lib/utils/api";
 import { auth } from "@/auth";
 import { createNotification } from "@/lib/utils/notifications";
+import { AppError } from "@/lib/utils/error";
+import { EntityType, NotificationType, DocumentType } from "@prisma/client";
 
-export async function createDocument(formData: FormData) {
+// Define the shape of the data expected by the action
+interface CreateDocumentArgs {
+  name: string;
+  fileUrl: string;
+  documentType: DocumentType;
+  uploadedById: string; // This was the missing property
+  propertyId?: string;
+  unitId?: string;
+  tenantId?: string;
+  description?: string;
+}
+
+export async function createDocument(data: CreateDocumentArgs) {
   const session = await auth();
-  if (!session?.user?.id) {
+  if (!session?.user?.id || session.user.id !== data.uploadedById) {
     throw new AppError("Unauthorized", 401);
   }
 
-  const file = formData.get('file') as File;
-  if (!file) {
-    throw new AppError("No file provided", 400);
-  }
-
-  const data = Object.fromEntries(formData);
-  
   try {
-    // Upload file to storage
-    const fileUrl = await uploadFile(file);
-
-    // Create document record with proper data structure
-    const documentData = {
-      name: data.name as string,
-      description: data.description as string,
-      documentType: data.documentType as DocumentType,
-      fileUrl,
-      uploadedById: session.user.id,
-      propertyId: data.propertyId as string || null,
-      unitId: data.unitId as string || null,
-      tenantId: data.tenantId as string || null,
-    };
-
     const document = await prisma.document.create({
-      data: documentData,
+      data: {
+        name: data.name,
+        fileUrl: data.fileUrl,
+        documentType: data.documentType,
+        uploadedById: data.uploadedById,
+        propertyId: data.propertyId || null,
+        unitId: data.unitId || null,
+        tenantId: data.tenantId || null,
+        description: data.description || null,
+      },
       include: {
         property: true,
         unit: {
           include: {
-            property: true
-          }
+            property: true,
+          },
         },
         tenant: true,
         uploadedBy: true,
@@ -57,6 +54,7 @@ export async function createDocument(formData: FormData) {
       entityId: document.id,
       entityType: EntityType.DOCUMENT,
       action: "CREATE",
+  
       changes: {
         name: document.name,
         type: document.documentType,
@@ -85,21 +83,70 @@ export async function createDocument(formData: FormData) {
 
     // Revalidate appropriate paths based on document context
     if (document.propertyId) {
-      revalidatePath(`/dashboard/properties?selected=${document.propertyId}`);
+      revalidatePath(`/dashboard/properties/${document.propertyId}`);
     }
     if (document.unitId) {
-      revalidatePath(`/dashboard/spaces?selected=${document.unitId}`);
+      revalidatePath(`/dashboard/spaces/${document.unitId}`);
     }
     if (document.tenantId) {
-      revalidatePath(`/dashboard/tenants?selected=${document.tenantId}`);
+      revalidatePath(`/dashboard/tenants/${document.tenantId}`);
     }
 
     return document;
   } catch (error) {
+    console.error("Failed to create document record:", error);
     throw new AppError(
-      "Failed to upload document",
+      "Failed to save document record",
       500,
-      "DOCUMENT_UPLOAD_ERROR"
+      "DOCUMENT_CREATE_ERROR"
     );
   }
+}
+
+export async function deleteDocument(documentId: string) {
+    const session = await auth();
+    if (!session?.user?.id) {
+        throw new AppError("Unauthorized", 401);
+    }
+
+    try {
+        const document = await prisma.document.findUnique({
+            where: { id: documentId },
+        });
+
+        if (!document) {
+            throw new AppError("Document not found", 404);
+        }
+
+        // Optional: Add ownership check if necessary
+        // if (document.uploadedById !== session.user.id) {
+        //     throw new AppError("Forbidden", 403);
+        // }
+
+        await prisma.document.delete({
+            where: { id: documentId },
+        });
+
+        await createAuditLog({
+            entityId: document.id,
+            entityType: EntityType.DOCUMENT,
+            action: "DELETE",
+            
+            changes: { name: document.name },
+        });
+
+        if (document.propertyId) {
+            revalidatePath(`/dashboard/properties/${document.propertyId}`);
+        }
+        if (document.tenantId) {
+            revalidatePath(`/dashboard/tenants/${document.tenantId}`);
+        }
+
+        return { success: true };
+
+    } catch (error) {
+        console.error("Failed to delete document:", error);
+        if (error instanceof AppError) throw error;
+        throw new AppError("Failed to delete document", 500, "DOCUMENT_DELETE_ERROR");
+    }
 }

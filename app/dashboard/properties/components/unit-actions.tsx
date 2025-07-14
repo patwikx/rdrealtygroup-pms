@@ -1,12 +1,32 @@
 'use client';
 
-import { Unit } from "@prisma/client";
+import { UnitStatus, FloorType } from "@prisma/client";
 import { EditUnitDialog } from "./edit-unit-dialog";
 import { DeleteUnitDialog } from "./delete-unit-dialog";
 
+type UnitWithFloors = {
+  id: string;
+  unitNumber: string;
+  totalArea: number;
+  totalRent: number;
+  status: UnitStatus;
+  propertyId: string;
+  propertyTitleId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  property: {
+    propertyName: string;
+  };
+  unitFloors: {
+    floorType: FloorType;
+    area: number;
+    rate: number;
+    rent: number;
+  }[];
+};
 
 interface UnitActionsProps {
-  unit: Unit;
+  unit: UnitWithFloors;
 }
 
 export function UnitActions({ unit }: UnitActionsProps) {

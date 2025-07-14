@@ -43,3 +43,23 @@ export function convertToCSV(data: any[], headers?: string[]): string {
 export function formatPropertyName(propertyName: string): string {
   return propertyName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
 }
+
+export function getDaysText(days: number): string {
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Tomorrow'
+  if (days < 0) return `${Math.abs(days)} days ago`
+  return `${days} days`
+}
+
+export function getUrgencyColor(days: number): string {
+  if (days <= 7) return 'text-red-600'
+  if (days <= 30) return 'text-orange-600'
+  if (days <= 60) return 'text-yellow-600'
+  return 'text-green-600'
+}
+
+export function getUrgencyBadgeVariant(days: number): 'destructive' | 'default' | 'secondary' {
+  if (days <= 7) return 'destructive'
+  if (days <= 30) return 'default'
+  return 'secondary'
+}

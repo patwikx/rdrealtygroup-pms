@@ -22,9 +22,13 @@ export async function getTenants() {
       include: {
         leases: {
           include: {
-            unit: {
+            leaseUnits: {
               include: {
-                property: true,
+                unit: {
+                  include: {
+                    property: true,
+                  },
+                },
               },
             },
             tenant: true,
@@ -40,7 +44,17 @@ export async function getTenants() {
             },
           },
         },
-        documents: true,
+        documents: {
+          include: {
+            uploadedBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
       },
     });
   } catch (error) {
@@ -52,47 +66,61 @@ export async function getTenants() {
   }
 }
 
-  export async function getTenantById(id: string) {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new AppError("Unauthorized", 401);
-    }
-  
-    try {
-      return await prisma.tenant.findUnique({
-        where: { id },
-        include: {
-          leases: {
-            include: {
-              unit: {
-                include: {
-                  property: true,
-                },
-              },
-              tenant: true,
-              payments: true,
-            },
-          },
-          maintenanceRequests: {
-            include: {
-              unit: {
-                include: {
-                  property: true,
-                },
-              },
-            },
-          },
-          documents: true,
-        },
-      });
-    } catch (error) {
-      throw new AppError(
-        "Failed to fetch tenant",
-        500,
-        "TENANT_FETCH_ERROR"
-      );
-    }
+export async function getTenantById(id: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new AppError("Unauthorized", 401);
   }
+
+  try {
+    return await prisma.tenant.findUnique({
+      where: { id },
+      include: {
+        leases: {
+          include: {
+            leaseUnits: {
+              include: {
+                unit: {
+                  include: {
+                    property: true,
+                  },
+                },
+              },
+            },
+            tenant: true,
+            payments: true,
+          },
+        },
+        maintenanceRequests: {
+          include: {
+            unit: {
+              include: {
+                property: true,
+              },
+            },
+          },
+        },
+        documents: {
+          include: {
+            uploadedBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  } catch (error) {
+    throw new AppError(
+      "Failed to fetch tenant",
+      500,
+      "TENANT_FETCH_ERROR"
+    );
+  }
+}
 
 export async function createTenant(formData: FormData) {
   const session = await auth()
@@ -112,12 +140,12 @@ export async function createTenant(formData: FormData) {
     const tenant = await prisma.tenant.create({
       data: {
         bpCode: formData.get('bpCode') as string,
-        firstName: formData.get('firstName') as string,
-        lastName: formData.get('lastName') as string,
+        firstName: formData.get('firstName') as string || null,
+        lastName: formData.get('lastName') as string || null,
         email: formData.get('email') as string,
         phone: formData.get('phone') as string,
         company: formData.get('company') as string,
-        businessName: formData.get('businessName') as string || null,
+        businessName: formData.get('businessName') as string,
         status: formData.get('status') as TenantStatus,
         emergencyContactName: formData.get('emergencyContactName') as string || null,
         emergencyContactPhone: formData.get('emergencyContactPhone') as string || null,
@@ -179,6 +207,7 @@ export async function updateTenant(id: string, formData: FormData) {
         email: data.email as string,
         phone: data.phone as string,
         company: data.company as string,
+        businessName: data.businessName as string,
         status: data.status as TenantStatus,
         emergencyContactName: data.emergencyContactName as string,
         emergencyContactPhone: data.emergencyContactPhone as string,
@@ -377,6 +406,7 @@ export async function importTenantsFromCSV(formData: FormData) {
         email: tenant.email,
         phone: tenant.phone,
         company: tenant.company,
+        businessName: tenant.businessName,
         status: normalizeTenantStatus(tenant.status),
         emergencyContactName: tenant.emergencyContactName,
         emergencyContactPhone: tenant.emergencyContactPhone,

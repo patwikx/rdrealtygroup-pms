@@ -81,7 +81,7 @@ export const LoginForm = () => {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4"
+              className="flex items-center justify-center mx-auto mb-4"
             >
               <Image src='/assets/rdrdc.webp' alt="rdrdc-logo" width={60} height={60} />
             </motion.div>
@@ -130,6 +130,7 @@ export const LoginForm = () => {
                                   {...field}
                                   disabled={isPending}
                                   type="email"
+                                  placeholder="example@gmail.com"
                                   className="pl-10"
                                 />
                               </div>
@@ -195,21 +196,7 @@ export const LoginForm = () => {
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or continue with
-                </span>
-              </div>
             </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              disabled={isPending}
-              onClick={onGoogleClick}
-            >
-              <FaGoogle className="mr-2 h-4 w-4" />
-              Google
-            </Button>
           </CardContent>
           <CardFooter className="flex justify-center">
             <p className="text-sm text-muted-foreground">

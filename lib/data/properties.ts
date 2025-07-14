@@ -1,13 +1,16 @@
 import { prisma } from "@/lib/db";
 import { cache } from "react";
 
+export const revalidate = 0;
+
 export const getProperties = cache(async () => {
   return prisma.property.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "asc" },
     include: {
       units: {
         include: {
           propertyTitle: true, // Include propertyTitle here
+          unitFloors: true, // Include unitFloors for each unit
         },
       },
       documents: true,

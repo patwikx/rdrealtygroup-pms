@@ -1,9 +1,9 @@
 'use client';
-import { useState } from "react";
+import { useState, useMemo } from "react"; // Added useMemo
 import { useRouter } from "next/navigation";
 import { PropertyWithRelations } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"; // Added CardFooter
 import {
   Table,
   TableBody,
@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Edit, Trash, Plus, Download, FileText, Building2, Droplets, Power, Wifi, Eye, Receipt, Calendar, MapPin, User, Loader2, ArrowUpDown, Map, Filter, X, Check, ChevronDown } from 'lucide-react';
+import { Edit, Trash, Download, FileText, Building2, Droplets, Power, Eye, Receipt, Calendar, MapPin, Loader2, Map, Filter, X, ChevronDown, Search, FilterIcon, ChevronLeft, ChevronRight } from 'lucide-react'; // Added ChevronLeft, ChevronRight
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -31,11 +31,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PropertyType, UtilityType, TitleMovementStatus } from "@prisma/client";
+import { PropertyType, UtilityType, TitleMovementStatus, FloorType, DocumentType } from "@prisma/client";
 import type { User as PrismaUser } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useAsync } from "@/hooks/use-async";
 import { deleteProperty, updateProperty } from "@/actions/property";
 import { AddUnitDialog } from "./add-unit-dialog";
 import { AddUtilityDialog } from "./add-utility-dialog";
@@ -44,7 +43,7 @@ import { toast } from "sonner";
 import { updatePropertyTaxStatus, updateUtilityStatus, deletePropertyTax } from "@/actions/property-tax";
 import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
-import { format } from "date-fns";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +59,61 @@ import { TitleMovementDialog } from "./title-movement-dialog";
 import { UpdateTitleStatusDialog } from "./update-title-movement-dialog";
 import { deletePropertyTitle } from "@/actions/property-titles";
 import { AddPropertyTitleDialog } from "./add-property-title-dialog";
+import { AddDocumentDialog } from "./upload-document-dialog";
+
+// Reusable Pagination Component
+const ITEMS_PER_PAGE = 10;
+
+const PaginationControls = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+  totalItems,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  totalItems: number;
+}) => {
+  if (totalPages <= 1) return null;
+
+  const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+  const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
+
+  return (
+    <div className="flex items-center justify-between">
+       <div className="text-sm text-slate-600 mr-2">
+        Showing <strong>{startItem}</strong> to <strong>{endItem}</strong> of <strong>{totalItems}</strong> entries
+      </div>
+      <div className="flex items-center space-x-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="border-slate-300 hover:bg-slate-50"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </Button>
+        <span className="text-sm font-medium text-slate-700">
+          Page {currentPage} of {totalPages}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="border-slate-300 hover:bg-slate-50"
+        >
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 
 interface PropertyDetailsProps {
   property: PropertyWithRelations;
@@ -67,18 +121,18 @@ interface PropertyDetailsProps {
   users: PrismaUser[];
 }
 
-// Title Filter Component
-const TitleFilter = ({ 
-  titles, 
-  selectedTitleIds, 
-  onSelectionChange 
+// Title Filter Component (No changes needed here)
+const TitleFilter = ({
+  titles,
+  selectedTitleIds,
+  onSelectionChange
 }: {
   titles: Array<{ id: string; titleNo: string; lotNo: string }>;
   selectedTitleIds: string[];
   onSelectionChange: (titleIds: string[]) => void;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  
+
   const handleTitleToggle = (titleId: string) => {
     if (selectedTitleIds.includes(titleId)) {
       onSelectionChange(selectedTitleIds.filter(id => id !== titleId));
@@ -86,19 +140,19 @@ const TitleFilter = ({
       onSelectionChange([...selectedTitleIds, titleId]);
     }
   };
-  
+
   const handleSelectAll = () => {
     onSelectionChange(titles.map(title => title.id));
   };
-  
+
   const handleClearAll = () => {
     onSelectionChange([]);
   };
-  
+
   const selectedCount = selectedTitleIds.length;
   const totalCount = titles.length;
   
-  return (
+   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all duration-200">
@@ -137,7 +191,7 @@ const TitleFilter = ({
               </Button>
             </div>
           </div>
-          
+
           <div className="border-t border-slate-200 pt-3">
             <div className="space-y-3 max-h-64 overflow-y-auto">
               {titles.map((title) => (
@@ -159,7 +213,7 @@ const TitleFilter = ({
               ))}
             </div>
           </div>
-          
+
           {selectedCount > 0 && (
             <div className="border-t border-slate-200 pt-3">
               <p className="text-xs text-slate-600">
@@ -173,14 +227,44 @@ const TitleFilter = ({
   );
 };
 
+
+// Floor type display helper
+const getFloorTypeDisplay = (floorType: FloorType) => {
+  const floorConfig = {
+    [FloorType.GROUND_FLOOR]: { label: "Ground Floor", short: "GF", icon: "🏢" },
+    [FloorType.MEZZANINE]: { label: "Mezzanine", short: "MZ", icon: "🏗️" },
+    [FloorType.SECOND_FLOOR]: { label: "2nd Floor", short: "2F", icon: "🏬" },
+    [FloorType.THIRD_FLOOR]: { label: "3rd Floor", short: "3F", icon: "🏭" },
+    [FloorType.ROOF_TOP]: { label: "Roof Top", short: "RT", icon: "🏔️" },
+  };
+  
+  return floorConfig[floorType] || { label: floorType, short: floorType.slice(0, 2), icon: "🏢" };
+};
+
 export function PropertyDetails({ property, currentUserId, users }: PropertyDetailsProps) {
+  // State for editing and confirmation dialogs
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
+
+  // Pagination states for each table
+  const [titlesPage, setTitlesPage] = useState(1);
+  const [unitsPage, setUnitsPage] = useState(1);
+  const [taxesPage, setTaxesPage] = useState(1);
+  const [documentsPage, setDocumentsPage] = useState(1);
+  const [movementsPage, setMovementsPage] = useState(1);
+  const [utilitiesPage, setUtilitiesPage] = useState(1);
+ 
+  // Filters state for Taxes table
   const [selectedTitleIds, setSelectedTitleIds] = useState<string[]>(
     property.titles?.map(title => title.id) || []
   );
+  
+  // Filters state for Documents table
+  const [documentSearchQuery, setDocumentSearchQuery] = useState('');
+  const [selectedDocumentType, setSelectedDocumentType] = useState<string>('all');
+  
   const router = useRouter();
 
   const handleDelete = async () => {
@@ -289,18 +373,22 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
     }
   };
 
+  // Calculate occupancy based on new totalArea field
   const occupiedUnitArea = property.units
-  .filter(unit => unit.status === 'OCCUPIED')
-  .reduce((sum, unit) => sum + Number(unit.unitArea), 0);
+    .filter(unit => unit.status === 'OCCUPIED')
+    .reduce((sum, unit) => sum + Number(unit.totalArea), 0);
   const leasableArea = Number(property.leasableArea);
- const occupancyRate = leasableArea > 0
-  ? (occupiedUnitArea / leasableArea) * 100
-  : 0;
+  const occupancyRate = leasableArea > 0
+    ? (occupiedUnitArea / leasableArea) * 100
+    : 0;
 
-  const totalRentAmount = property.units.reduce((sum, unit) => sum + Number(unit.rentAmount), 0);
+  // Calculate total rent from new totalRent field
+  const totalRentAmount = property.units.reduce((sum, unit) => sum + Number(unit.totalRent), 0);
 
   // Calculate total lot area from property titles
   const totalLotArea = property.titles?.reduce((sum, title) => sum + Number(title.lotArea), 0) || 0;
+
+  
 
   // Get all property taxes from all titles
   const allPropertyTaxes = property.titles?.flatMap(title => 
@@ -321,6 +409,48 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
   const unpaidTaxes = filteredPropertyTaxes.filter(tax => !tax.isPaid);
   const paidTaxAmount = paidTaxes.reduce((sum, tax) => sum + Number(tax.taxAmount), 0);
   const unpaidTaxAmount = unpaidTaxes.reduce((sum, tax) => sum + Number(tax.taxAmount), 0);
+
+  // Filter documents based on search query and document type
+  const filteredDocuments = property.documents.filter((doc) => {
+    const matchesSearch = documentSearchQuery === '' || 
+      doc.name.toLowerCase().includes(documentSearchQuery.toLowerCase()) ||
+      (doc.description && doc.description.toLowerCase().includes(documentSearchQuery.toLowerCase()));
+    
+    const matchesType = selectedDocumentType === 'all' || doc.documentType === selectedDocumentType;
+    
+    return matchesSearch && matchesType;
+  });
+
+
+   // Paginating Titles
+  const totalTitlesPages = Math.ceil((property.titles?.length || 0) / ITEMS_PER_PAGE);
+  const paginatedTitles = property.titles?.slice((titlesPage - 1) * ITEMS_PER_PAGE, titlesPage * ITEMS_PER_PAGE);
+
+  // Paginating Units
+  const totalUnitsPages = Math.ceil(property.units.length / ITEMS_PER_PAGE);
+  const paginatedUnits = property.units.slice((unitsPage - 1) * ITEMS_PER_PAGE, unitsPage * ITEMS_PER_PAGE);
+
+  // Paginating Filtered Taxes
+  const totalTaxesPages = Math.ceil(filteredPropertyTaxes.length / ITEMS_PER_PAGE);
+  const paginatedTaxes = filteredPropertyTaxes.slice((taxesPage - 1) * ITEMS_PER_PAGE, taxesPage * ITEMS_PER_PAGE);
+  
+  // Paginating Filtered Documents
+  const totalDocumentsPages = Math.ceil(filteredDocuments.length / ITEMS_PER_PAGE);
+  const paginatedDocuments = filteredDocuments.slice((documentsPage - 1) * ITEMS_PER_PAGE, documentsPage * ITEMS_PER_PAGE);
+  
+  // Paginating Title Movements
+  const totalMovementsPages = Math.ceil((property.titleMovements?.length || 0) / ITEMS_PER_PAGE);
+  const paginatedMovements = property.titleMovements?.slice((movementsPage - 1) * ITEMS_PER_PAGE, movementsPage * ITEMS_PER_PAGE);
+
+  // Paginating Utilities
+  const totalUtilitiesPages = Math.ceil(property.utilities.length / ITEMS_PER_PAGE);
+  const paginatedUtilities = property.utilities.slice((utilitiesPage - 1) * ITEMS_PER_PAGE, utilitiesPage * ITEMS_PER_PAGE);
+  
+  // --- End of Data Filtering and Pagination Logic ---
+  
+
+  // Get unique document types for the filter dropdown
+  const documentTypes = Array.from(new Set(property.documents.map(doc => doc.documentType)));
 
   const handleExportTitlesCSV = () => {
     const csvData = property.titles.map(title => ({
@@ -355,19 +485,22 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
   };
 
   const handleExportUnitsCSV = () => {
-    const csvData = property.units.map(unit => ({
-      'Title No.': unit.propertyTitle?.titleNo || '-',
-      'Space Number': unit.unitNumber,
-      'Area (sqm)': unit.unitArea.toString(),
-      'Rate': Number(unit.unitRate).toFixed(2),
-      'Rent Amount': Number(unit.rentAmount).toFixed(2),
-      'Ground Floor': unit.isFirstFloor ? 'Yes' : 'No',
-      'Second Floor': unit.isSecondFloor ? 'Yes' : 'No',
-      'Third Floor': unit.isThirdFloor ? 'Yes' : 'No',
-      'Rooftop': unit.isRoofTop ? 'Yes' : 'No',
-      'Mezzanine': unit.isMezzanine ? 'Yes' : 'No',
-      'Status': unit.status,
-    }));
+    const csvData = property.units.map(unit => {
+      // Create floor breakdown for CSV
+      const floorBreakdown = unit.unitFloors?.map(floor => {
+        const floorDisplay = getFloorTypeDisplay(floor.floorType);
+        return `${floorDisplay.label}: ${floor.area}sqm @ ₱${floor.rate}/sqm = ₱${floor.rent}`;
+      }).join('; ') || 'No floor data';
+
+      return {
+        'Title No.': unit.propertyTitle?.titleNo || '-',
+        'Space Number': unit.unitNumber,
+        'Total Area (sqm)': unit.totalArea.toString(),
+        'Total Rent': Number(unit.totalRent).toFixed(2),
+        'Floor Breakdown': floorBreakdown,
+        'Status': unit.status,
+      };
+    });
 
     const headers = Object.keys(csvData[0]);
     const csvString = [
@@ -449,6 +582,37 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     const filename = `property_${property.propertyName}_taxes_filtered_${new Date().toISOString().split('T')[0]}.csv`;
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportDocumentsCSV = () => {
+    const csvData = filteredDocuments.map(doc => ({
+      'Name': doc.name,
+      'Description': doc.description || '-',
+      'Type': doc.documentType,
+      'Uploaded By': users.find(u => u.id === doc.uploadedById)?.firstName + ' ' + users.find(u => u.id === doc.uploadedById)?.lastName,
+      'Uploaded Date': formatDate(doc.createdAt),
+      'File URL': doc.fileUrl,
+    }));
+
+    const headers = Object.keys(csvData[0]);
+    const csvString = [
+      headers.join(','),
+      ...csvData.map(row => headers.map(header => {
+        const value = row[header as keyof typeof row];
+        return `"${value}"`;
+      }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    const filename = `property_${property.propertyName}_documents_${new Date().toISOString().split('T')[0]}.csv`;
     link.setAttribute('download', filename);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
@@ -738,11 +902,11 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
             </Card>
             <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all duration-200">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-sm font-semibold text-slate-900">Total Spaces</CardTitle>
+                <CardTitle className="text-sm font-semibold text-slate-900">Total Titles</CardTitle>
                 <Building2 className="h-5 w-5 text-slate-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-slate-900">{property.totalUnits}</div>
+                <div className="text-2xl font-bold text-slate-900">{property.titles.length}</div>
                 <p className="text-xs text-slate-700 mt-1">
                   {property.units.length} spaces created
                 </p>
@@ -753,13 +917,13 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                 <CardTitle className="text-sm font-semibold text-slate-900">Occupancy Rate</CardTitle>
                 <Building2 className="h-5 w-5 text-slate-600" />
               </CardHeader>
-  <CardContent>
-    <div className="text-2xl font-bold text-slate-900">{Math.round(occupancyRate)}%</div>
-    <Progress value={occupancyRate} className="mt-3 h-2 bg-slate-200" />
-    <p className="text-xs text-slate-700 mt-2">
-      {occupiedUnitArea} / {Number(property.leasableArea)} sqm occupied
-    </p>
-  </CardContent>
+              <CardContent>
+                <div className="text-2xl font-bold text-slate-900">{Math.round(occupancyRate)}%</div>
+                <Progress value={occupancyRate} className="mt-3 h-2 bg-slate-200" />
+                <p className="text-xs text-slate-700 mt-2">
+                  {occupiedUnitArea} / {Number(property.leasableArea)} sqm occupied
+                </p>
+              </CardContent>
             </Card>
             <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all duration-200">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -916,7 +1080,7 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {!property.titles?.length ? (
+                  {!paginatedTitles?.length ? (
                     <TableRow>
                       <TableCell colSpan={8} className="h-32 text-center text-slate-500">
                         <div className="flex flex-col items-center gap-2">
@@ -926,7 +1090,7 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                       </TableCell>
                     </TableRow>
                   ) : (
-                    property.titles.map((title) => (
+                    paginatedTitles.map((title) => (
                       <TableRow key={title.id} className="hover:bg-slate-50 transition-colors duration-150">
                         <TableCell className="font-mono text-slate-900">{title.titleNo}</TableCell>
                         <TableCell className="text-slate-900">{title.lotNo}</TableCell>
@@ -982,48 +1146,71 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                 </TableBody>
               </Table>
             </CardContent>
+            {/* Add CardFooter for pagination controls */}
+            <CardFooter className="p-4 border-t border-slate-200">
+              <PaginationControls
+                currentPage={titlesPage}
+                totalPages={totalTitlesPages}
+                onPageChange={setTitlesPage}
+                totalItems={property.titles?.length || 0}
+              />
+            </CardFooter>
           </Card>
         </TabsContent>
 
-        <TabsContent value="units" className="space-y-6">
-          <div className="flex justify-between items-center bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
-            <h3 className="text-xl font-semibold text-slate-900">Spaces</h3>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={handleExportUnitsCSV}
-                disabled={!property.units.length}
-                className="border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all duration-200"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export to CSV
-              </Button>
-              <AddUnitDialog propertyId={property.id} />
-            </div>
+<TabsContent value="units" className="space-y-6">
+  <div className="flex justify-between items-center bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
+    <div>
+      <h3 className="text-xl font-semibold text-slate-900">Spaces</h3>
+      <p className="text-sm text-slate-600 mt-1">
+        Manage spaces within this property.
+      </p>
+    </div>
+
+    {/* ===== Floor Type Legend Start ===== */}
+    <div className="hidden lg:flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-slate-600 flex-1 mx-4">
+      {Object.values(FloorType).map((type) => {
+        const { label, short } = getFloorTypeDisplay(type);
+        return (
+          <div key={type}>
+            {label} = <span className="font-mono font-semibold">{short}</span>
           </div>
-          <Card className="bg-white border-slate-200 shadow-sm">
+        );
+      })}
+    </div>
+    {/* ===== Floor Type Legend End ===== */}
+    
+    <div className="flex gap-3">
+      <Button
+        variant="outline"
+        onClick={handleExportUnitsCSV}
+        disabled={!property.units.length}
+        className="border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all duration-200"
+      >
+        <Download className="h-4 w-4 mr-2" />
+        Export to CSV
+      </Button>
+      <AddUnitDialog propertyId={property.id} />
+    </div>
+  </div>
+  <Card className="bg-white border-slate-200 shadow-sm">
             <CardContent className="p-0">
               <Table>
                 <TableHeader className="bg-slate-50 border-b border-slate-200">
                   <TableRow>
                     <TableHead className="font-semibold text-slate-700">Title No.</TableHead>
                     <TableHead className="font-semibold text-slate-700">Space Number</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Area (sqm)</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Rate</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Rent Amount</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Ground Floor</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Second Floor</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Third Floor</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Rooftop Floor</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Mezzanine</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Floor Area & Rate</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Total Area (sqm)</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Total Rent</TableHead>
                     <TableHead className="font-semibold text-slate-700">Status</TableHead>
-                    <TableHead className="text-right font-semibold text-slate-700">Actions</TableHead>
+                    <TableHead className="text-center font-semibold text-slate-700">{/*Actions*/}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {property.units.length === 0 ? (
+                  {paginatedUnits.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={12} className="h-32 text-center text-slate-500">
+                      <TableCell colSpan={6} className="h-32 text-center text-slate-500">
                         <div className="flex flex-col items-center gap-2">
                           <Building2 className="h-8 w-8 text-slate-300" />
                           <span>No space records found</span>
@@ -1031,40 +1218,35 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                       </TableCell>
                     </TableRow>
                   ) : (
-                    property.units.map((unit) => (
+                    paginatedUnits.map((unit) => (
                       <TableRow key={unit.id} className="hover:bg-slate-50 transition-colors duration-150">
                         <TableCell className="font-semibold text-slate-900">
                           {unit.propertyTitle?.titleNo || '-'}
                         </TableCell>
                         <TableCell className="font-semibold text-slate-900">{unit.unitNumber}</TableCell>
-                        <TableCell className="text-slate-900">{unit.unitArea.toString()}</TableCell>
-                        <TableCell className="text-slate-900">{formatCurrency(Number(unit.unitRate))}</TableCell>
-                        <TableCell className="font-semibold text-slate-900">{formatCurrency(Number(unit.rentAmount))}</TableCell>
                         <TableCell>
-                          <Badge variant={unit.isFirstFloor ? "default" : "secondary"} className={unit.isFirstFloor ? "bg-orange-100 text-orange-800 border-orange-200" : "bg-slate-100 text-slate-600 border-slate-200"}>
-                            {unit.isFirstFloor ? "Yes" : "No"}
-                          </Badge>
+                          <div className="flex flex-wrap gap-1">
+                            {unit.unitFloors?.map((floor) => {
+                              const floorDisplay = getFloorTypeDisplay(floor.floorType);
+                              return (
+                                <Badge 
+                                  key={floor.id} 
+                                  variant="outline" 
+                                  className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+                                  title={`${floorDisplay.label}: ${floor.area}sqm @ ₱${floor.rate}/sqm = ₱${floor.rent}`}
+                                >
+                                  {floorDisplay.short} ({floor.area} sqm)
+                                  <span className="text-xs text-slate-500">{formatCurrency(floor.rate)}</span>
+                                </Badge>
+                              );
+                            }) || (
+                              <span className="text-slate-400 text-xs italic">No floor data</span>
+                            )}
+                          </div>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant={unit.isSecondFloor ? "default" : "secondary"} className={unit.isSecondFloor ? "bg-orange-100 text-orange-800 border-orange-200" : "bg-slate-100 text-slate-600 border-slate-200"}>
-                            {unit.isSecondFloor ? "Yes" : "No"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={unit.isThirdFloor ? "default" : "secondary"} className={unit.isThirdFloor ? "bg-orange-100 text-orange-800 border-orange-200" : "bg-slate-100 text-slate-600 border-slate-200"}>
-                            {unit.isThirdFloor ? "Yes" : "No"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={unit.isRoofTop ? "default" : "secondary"} className={unit.isRoofTop ? "bg-orange-100 text-orange-800 border-orange-200" : "bg-slate-100 text-slate-600 border-slate-200"}>
-                            {unit.isRoofTop ? "Yes" : "No"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={unit.isMezzanine ? "default" : "secondary"} className={unit.isMezzanine ? "bg-orange-100 text-orange-800 border-orange-200" : "bg-slate-100 text-slate-600 border-slate-200"}>
-                            {unit.isMezzanine ? "Yes" : "No"}
-                          </Badge>
-                        </TableCell>
+                        <TableCell className="text-slate-900">{unit.totalArea.toString()}</TableCell>
+                        <TableCell className="font-semibold text-slate-900">{formatCurrency(Number(unit.totalRent))}</TableCell>
+
                         <TableCell>
                           <Badge 
                             variant={unit.status === "OCCUPIED" ? "default" : "secondary"}
@@ -1087,6 +1269,14 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                 </TableBody>
               </Table>
             </CardContent>
+                    <CardFooter className="p-4 border-t border-slate-200">
+              <PaginationControls
+                currentPage={unitsPage}
+                totalPages={totalUnitsPages}
+                onPageChange={setUnitsPage}
+                totalItems={property.units.length}
+              />
+            </CardFooter>
           </Card>
         </TabsContent>
 
@@ -1185,7 +1375,7 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {property.utilities.length === 0 ? (
+                {paginatedUtilities.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-32 text-center text-slate-500">
                       <div className="flex flex-col items-center gap-2">
@@ -1195,7 +1385,7 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                     </TableCell>
                   </TableRow>
                 ) : (
-                  property.utilities.map((utility) => (
+                  paginatedUtilities.map((utility) => (
                     <TableRow key={utility.id} className="hover:bg-slate-50 transition-colors duration-150">
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -1228,6 +1418,14 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                 )}
               </TableBody>
             </Table>
+      <div className="p-4 border-t border-slate-200">
+               <PaginationControls
+                  currentPage={utilitiesPage}
+                  totalPages={totalUtilitiesPages}
+                  onPageChange={setUtilitiesPage}
+                  totalItems={property.utilities.length}
+                />
+            </div>
           </div>
         </TabsContent>
 
@@ -1270,7 +1468,7 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                   <Filter className="h-5 w-5 text-blue-600" />
                   <div>
                     <p className="text-sm font-medium text-blue-900">
-                      Showing {filteredPropertyTaxes.length} tax records from {selectedTitleIds.length} selected titles
+                      Showing {paginatedTaxes.length} tax records from {selectedTitleIds.length} selected titles
                     </p>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {property.titles
@@ -1315,7 +1513,7 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPropertyTaxes.length === 0 ? (
+                  {paginatedTaxes.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={10} className="h-32 text-center text-slate-500">
                         <div className="flex flex-col items-center gap-2">
@@ -1335,7 +1533,7 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredPropertyTaxes.map((tax) => (
+                    paginatedTaxes.map((tax) => (
                       <TableRow key={tax.id} className="hover:bg-slate-50 transition-colors duration-150">
                         <TableCell>
                           <div className="flex flex-col">
@@ -1410,23 +1608,124 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                 </TableBody>
               </Table>
             </CardContent>
+            <CardFooter className="p-4 border-t border-slate-200">
+              <PaginationControls
+                currentPage={taxesPage}
+                totalPages={totalTaxesPages}
+                onPageChange={setTaxesPage}
+                totalItems={filteredPropertyTaxes.length}
+              />
+            </CardFooter>
           </Card>
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-6">
           <div className="flex justify-between items-center bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
-            <h3 className="text-xl font-semibold text-slate-900">Documents</h3>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-200">
-              <Plus className="h-4 w-4 mr-2" />
-              Upload Document
-            </Button>
+            <div>
+              <h3 className="text-xl font-semibold text-slate-900">Documents</h3>
+              <p className="text-sm text-slate-600 mt-1">
+                Manage property documents and files
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={handleExportDocumentsCSV}
+                disabled={!filteredDocuments.length}
+                className="border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all duration-200"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export to CSV
+              </Button>
+              <AddDocumentDialog
+                propertyId={property.id}
+                currentUserId={currentUserId}
+              />
+            </div>
           </div>
+
+          {/* Search and Filter Controls */}
+   
+            <div className="flex sm:flex-row gap-4 items-center">
+              <div className="w-full sm:w-auto">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search documents by name or description..."
+                    value={documentSearchQuery}
+                    onChange={(e) => setDocumentSearchQuery(e.target.value)}
+                    className="pl-10 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20 w-full sm:w-[400px]"
+                  />
+                </div>
+              </div>
+              <div className="w-full sm:w-64">
+                <Select value={selectedDocumentType} onValueChange={setSelectedDocumentType}>
+                  <SelectTrigger className="focus:border-blue-500 focus:ring-blue-500/20 w-full">
+                    <SelectValue placeholder="Filter by type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-slate-200">
+                    <SelectItem value="all">
+  <div className="flex items-center">
+    <FilterIcon className="h-4 w-4 mr-2" />
+    <span>All Types</span>
+  </div>
+</SelectItem>
+                    {documentTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type.toLowerCase().charAt(0).toUpperCase() + type.toLowerCase().slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Filter Status Display */}
+            {(documentSearchQuery || selectedDocumentType !== 'all') && (
+              <div className="mt-4 pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Search className="h-4 w-4 text-slate-600" />
+                    <div className="text-sm text-slate-600">
+                      Showing {filteredDocuments.length} of {property.documents.length} documents
+                      {documentSearchQuery && (
+                        <span className="ml-1">
+                          matching &quot;<span className="font-medium">{documentSearchQuery}</span>&quot;
+                        </span>
+                      )}
+                      {selectedDocumentType !== 'all' && (
+                        <span className="ml-1">
+                          {documentSearchQuery ? 'and' : 'with'} type &quot;<span className="font-medium">{selectedDocumentType.toLowerCase()}</span>&quot;
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {(documentSearchQuery || selectedDocumentType !== 'all') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setDocumentSearchQuery('');
+                        setSelectedDocumentType('all');
+                      }}
+                      className="text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Clear filters
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+         
+
           <Card className="bg-white border-slate-200 shadow-sm">
             <CardContent className="p-0">
               <Table>
                 <TableHeader className="bg-slate-50 border-b border-slate-200">
                   <TableRow>
-                    <TableHead className="font-semibold text-slate-700">Name</TableHead>
+                    <TableHead className="font-semibold text-slate-700">File Name</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Description</TableHead>
                     <TableHead className="font-semibold text-slate-700">Type</TableHead>
                     <TableHead className="font-semibold text-slate-700">Uploaded By</TableHead>
                     <TableHead className="font-semibold text-slate-700">Uploaded</TableHead>
@@ -1434,32 +1733,52 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {property.documents.length === 0 ? (
+                  {paginatedDocuments.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-32 text-center text-slate-500">
+                      <TableCell colSpan={6} className="h-32 text-center text-slate-500">
                         <div className="flex flex-col items-center gap-2">
                           <FileText className="h-8 w-8 text-slate-300" />
-                          <span>No document records found</span>
+                          {property.documents.length === 0 ? (
+                            <span>No documents found</span>
+                          ) : (
+                            <span>No documents match your search criteria</span>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    property.documents.map((doc) => (
+                    paginatedDocuments.map((doc) => (
                       <TableRow key={doc.id} className="hover:bg-slate-50 transition-colors duration-150">
                         <TableCell className="font-semibold text-slate-900">{doc.name}</TableCell>
+                        <TableCell className="text-slate-900">
+                          {doc.description ? (
+                            <span className="capitalize">{doc.description}</span>
+                          ) : (
+                            <span className="text-slate-400 italic">No description</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                             {doc.documentType.toLowerCase()}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-slate-900">
-                          {doc.uploadedById}
+                          {users.find(u => u.id === doc.uploadedById)?.firstName}{' '}
+                          {users.find(u => u.id === doc.uploadedById)?.lastName}
                         </TableCell>
                         <TableCell className="text-slate-600">{formatDate(doc.createdAt)}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" className="hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150">
-                            <Download className="h-4 w-4" />
-                          </Button>
+                          <a
+                            href={doc.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={doc.name}
+                            title={`Download ${doc.name}`}
+                          >
+                            <Button variant="ghost" size="sm" className="hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </a>
                         </TableCell>
                       </TableRow>
                     ))
@@ -1467,6 +1786,14 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                 </TableBody>
               </Table>
             </CardContent>
+                      <CardFooter className="p-4 border-t border-slate-200">
+              <PaginationControls
+                currentPage={documentsPage}
+                totalPages={totalDocumentsPages}
+                onPageChange={setDocumentsPage}
+                totalItems={filteredDocuments.length}
+              />
+            </CardFooter>
           </Card>
         </TabsContent>
 
@@ -1497,7 +1824,7 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {property.titleMovements?.length === 0 ? (
+                  {paginatedMovements?.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="h-32 text-center text-slate-500">
                         <div className="flex flex-col items-center gap-2">
@@ -1507,7 +1834,7 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                       </TableCell>
                     </TableRow>
                   ) : (
-                    property.titleMovements?.map((movement) => (
+                    paginatedMovements?.map((movement) => (
                       <TableRow key={movement.id} className="hover:bg-slate-50 transition-colors duration-150">
                         <TableCell className="text-slate-900">{formatDate(movement.requestDate)}</TableCell>
                         <TableCell className="text-slate-900">{movement.location}</TableCell>
@@ -1526,7 +1853,8 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                         <TableCell className="text-slate-600">{movement.remarks || '-'}</TableCell>
                         <TableCell className="text-right">
                           <UpdateTitleStatusDialog
-                            titleMovementId={movement.id}
+                            titleMovementId={movement.id}  
+                            
                             currentStatus={movement.status as TitleMovementStatus}
                           />
                         </TableCell>
@@ -1536,6 +1864,14 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                 </TableBody>
               </Table>
             </CardContent>
+                         <CardFooter className="p-4 border-t border-slate-200">
+              <PaginationControls
+                currentPage={movementsPage}
+                totalPages={totalMovementsPages}
+                onPageChange={setMovementsPage}
+                totalItems={property.titleMovements?.length || 0}
+              />
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>

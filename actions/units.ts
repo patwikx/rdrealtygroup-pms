@@ -3,10 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { createAuditLog } from "@/lib/audit";
-import { EntityType, NotificationType, UnitStatus } from "@prisma/client";
+import { EntityType, NotificationType, UnitStatus, FloorType } from "@prisma/client";
 import { AppError } from "@/lib/utils/error";
 import { auth } from "@/auth";
 import { createNotification } from "@/lib/utils/notifications";
+
+interface FloorItem {
+  floorType: string;
+  area: number;
+  rate: number;
+}
 
 export async function createUnit(formData: FormData) {
   const session = await auth();
@@ -25,30 +31,52 @@ export async function createUnit(formData: FormData) {
     const creator = users.find(u => u.id === session.user.id);
     const creatorName = creator ? `${creator.firstName} ${creator.lastName}` : 'Unknown user';
 
+    // Parse floors data
+    const floorsData: FloorItem[] = JSON.parse(data.floors as string);
+    
+    // Validate floors data
+    if (!floorsData || floorsData.length === 0) {
+      throw new AppError("At least one floor must be specified", 400);
+    }
+
     const unitData: any = {
       propertyId: data.propertyId as string,
       unitNumber: data.unitNumber as string,
-      unitArea: parseFloat(data.unitArea as string),
-      unitRate: parseFloat(data.unitRate as string),
-      rentAmount: parseFloat(data.rentAmount as string),
+      totalArea: parseFloat(data.totalArea as string),
+      totalRent: parseFloat(data.totalRent as string),
       status: data.status as UnitStatus,
-      // Add new floor-related fields
-      isFirstFloor: data.isFirstFloor === 'true',
-      isSecondFloor: data.isSecondFloor === 'true',
-      isThirdFloor: data.isThirdFloor === 'true',
-      isRoofTop: data.isRoofTop === 'true',
-      isMezzanine: data.isMezzanine === 'true',
     };
 
     if (data.propertyTitleId) {
       unitData.propertyTitleId = data.propertyTitleId as string;
     }
 
-    const unit = await prisma.unit.create({
-      data: unitData,
-      include: {
-        property: true,
-      },
+    // Create unit with floors in a transaction
+    const unit = await prisma.$transaction(async (prisma) => {
+      // Create the unit
+      const createdUnit = await prisma.unit.create({
+        data: unitData,
+        include: {
+          property: true,
+        },
+      });
+
+      // Create the unit floors
+      const floorPromises = floorsData.map(floor => {
+        return prisma.unitFloor.create({
+          data: {
+            unitId: createdUnit.id,
+            floorType: floor.floorType as FloorType,
+            area: floor.area,
+            rate: floor.rate,
+            rent: floor.area * floor.rate,
+          },
+        });
+      });
+
+      await Promise.all(floorPromises);
+
+      return createdUnit;
     });
 
     // Update property total units count
@@ -65,7 +93,7 @@ export async function createUnit(formData: FormData) {
       entityId: unit.id,
       entityType: EntityType.UNIT,
       action: "CREATE",
-      changes: data,
+      changes: { ...data, floors: floorsData },
     });
 
     // Notify all users about the new unit
@@ -110,37 +138,64 @@ export async function updateUnit(id: string, formData: FormData) {
     const updater = users.find(u => u.id === session.user.id);
     const updaterName = updater ? `${updater.firstName} ${updater.lastName}` : 'Unknown user';
 
+    // Parse floors data
+    const floorsData: FloorItem[] = JSON.parse(data.floors as string);
+    
+    // Validate floors data
+    if (!floorsData || floorsData.length === 0) {
+      throw new AppError("At least one floor must be specified", 400);
+    }
+
     const updateData: any = {
       unitNumber: data.unitNumber as string,
-      unitArea: parseFloat(data.unitArea as string),
-      unitRate: parseFloat(data.unitRate as string),
-      rentAmount: parseFloat(data.rentAmount as string),
+      totalArea: parseFloat(data.totalArea as string),
+      totalRent: parseFloat(data.totalRent as string),
       status: data.status as UnitStatus,
-      // Add new floor-related fields
-      isFirstFloor: data.isFirstFloor === 'true',
-      isSecondFloor: data.isSecondFloor === 'true',
-      isThirdFloor: data.isThirdFloor === 'true',
-      isRoofTop: data.isRoofTop === 'true',
-      isMezzanine: data.isMezzanine === 'true',
     };
 
     if (data.propertyTitleId) {
       updateData.propertyTitleId = data.propertyTitleId as string;
     }
 
-    const unit = await prisma.unit.update({
-      where: { id },
-      data: updateData,
-      include: {
-        property: true,
-      },
+    // Update unit with floors in a transaction
+    const unit = await prisma.$transaction(async (prisma) => {
+      // Update the unit
+      const updatedUnit = await prisma.unit.update({
+        where: { id },
+        data: updateData,
+        include: {
+          property: true,
+        },
+      });
+
+      // Delete existing floors
+      await prisma.unitFloor.deleteMany({
+        where: { unitId: id },
+      });
+
+      // Create new floors
+      const floorPromises = floorsData.map(floor => {
+        return prisma.unitFloor.create({
+          data: {
+            unitId: id,
+            floorType: floor.floorType as FloorType,
+            area: floor.area,
+            rate: floor.rate,
+            rent: floor.area * floor.rate,
+          },
+        });
+      });
+
+      await Promise.all(floorPromises);
+
+      return updatedUnit;
     });
 
     await createAuditLog({
       entityId: unit.id,
       entityType: EntityType.UNIT,
       action: "UPDATE",
-      changes: data,
+      changes: { ...data, floors: floorsData },
     });
 
     // Notify all users about the unit update
@@ -183,6 +238,7 @@ export async function deleteUnit(id: string) {
     const deleter = users.find(u => u.id === session.user.id);
     const deleterName = deleter ? `${deleter.firstName} ${deleter.lastName}` : 'Unknown user';
 
+    // Delete unit and associated floors (will cascade)
     const unit = await prisma.unit.delete({
       where: { id },
       include: {
@@ -248,7 +304,8 @@ export async function getAvailableUnits() {
         ]
       },
       include: {
-        property: true
+        property: true,
+        unitFloors: true,
       }
     });
   } catch (error) {
@@ -285,6 +342,7 @@ export async function bulkDeleteUnits(ids: string[]) {
       },
     });
     
+    // Delete units (floors will cascade)
     await prisma.unit.deleteMany({
       where: {
         id: {
@@ -328,31 +386,134 @@ export async function bulkDeleteUnits(ids: string[]) {
 }
 
 export async function updateUnitDialog(id: string, formData: FormData) {
-  const unitArea = formData.get("unitArea");
-  const unitRate = formData.get("unitRate");
-  const rentAmount = formData.get("rentAmount");
-  const isFirstFloor = formData.get("isFirstFloor") === "on";
-  const isSecondFloor = formData.get("isSecondFloor") === "on";
-  const isThirdFloor = formData.get("isThirdFloor") === "on";
-  const isRoofTop = formData.get("isRoofTop") === "on";
-  const isMezzanine = formData.get("isMezzanine") === "on";
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new AppError("Unauthorized", 401);
+  }
 
-  const updatedUnit = await prisma.unit.update({
-    where: { id },
-    data: {
-      unitArea: parseFloat(unitArea as string),
-      unitRate: parseFloat(unitRate as string),
-      rentAmount: parseFloat(rentAmount as string),
-      isFirstFloor,
-      isSecondFloor,
-      isThirdFloor,
-      isRoofTop,
-      isMezzanine,
-    },
-  });
+  try {
+    // Parse floors data if provided
+    const floorsData = formData.get("floors");
+    let floors: FloorItem[] = [];
+    
+    if (floorsData) {
+      floors = JSON.parse(floorsData as string);
+    }
 
-  revalidatePath("/dashboard/spaces");
-  revalidatePath(`/units/${id}`);
-  
-  return updatedUnit;
+    const updateData: any = {};
+
+    // Handle individual field updates
+    if (formData.get("totalArea")) {
+      updateData.totalArea = parseFloat(formData.get("totalArea") as string);
+    }
+    if (formData.get("totalRent")) {
+      updateData.totalRent = parseFloat(formData.get("totalRent") as string);
+    }
+    if (formData.get("status")) {
+      updateData.status = formData.get("status") as UnitStatus;
+    }
+
+    const updatedUnit = await prisma.$transaction(async (prisma) => {
+      // Update the unit
+      const unit = await prisma.unit.update({
+        where: { id },
+        data: updateData,
+        include: {
+          unitFloors: true,
+        },
+      });
+
+      // If floors data is provided, update floors
+      if (floors.length > 0) {
+        // Delete existing floors
+        await prisma.unitFloor.deleteMany({
+          where: { unitId: id },
+        });
+
+        // Create new floors
+        const floorPromises = floors.map(floor => {
+          return prisma.unitFloor.create({
+            data: {
+              unitId: id,
+              floorType: floor.floorType as FloorType,
+              area: floor.area,
+              rate: floor.rate,
+              rent: floor.area * floor.rate,
+            },
+          });
+        });
+
+        await Promise.all(floorPromises);
+      }
+
+      return unit;
+    });
+
+    await createAuditLog({
+      entityId: id,
+      entityType: EntityType.UNIT,
+      action: "UPDATE",
+      changes: Object.fromEntries(formData),
+    });
+
+    revalidatePath("/dashboard/spaces");
+    revalidatePath(`/units/${id}`);
+    
+    return updatedUnit;
+  } catch (error) {
+    console.error("Error updating unit:", error);
+    throw new AppError(
+      "Failed to update space. Please try again.",
+      500
+    );
+  }
+}
+
+export async function getUnitWithFloors(id: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new AppError("Unauthorized", 401);
+  }
+
+  try {
+    return await prisma.unit.findUnique({
+      where: { id },
+      include: {
+        property: true,
+        propertyTitle: true,
+        unitFloors: {
+          orderBy: {
+            floorType: 'asc'
+          }
+        },
+        leaseUnits: {
+          include: {
+            lease: {
+              
+              include: {
+                tenant: true
+              }
+            }
+          }
+        },
+        maintenanceRequests: {
+          where: {
+            status: {
+              not: 'COMPLETED'
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 5
+        }
+      }
+    });
+  } catch (error) {
+    throw new AppError(
+      "Failed to fetch space details",
+      500,
+      "UNIT_FETCH_ERROR"
+    );
+  }
 }

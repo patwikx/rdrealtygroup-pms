@@ -128,21 +128,22 @@ export function AddPropertyTaxDialog({ propertyTitles, users, currentUserId }: A
           Add Property Tax
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] bg-white border-slate-200">
-        <DialogHeader className="pb-4 border-b border-slate-100">
-          <DialogTitle className="text-xl font-semibold text-slate-900">Add Property Tax Record</DialogTitle>
+      <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto bg-white border-slate-200">
+        <DialogHeader className="pb-3 border-b border-slate-100">
+          <DialogTitle className="text-lg font-semibold text-slate-900">Add Property Tax Record</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(submitForm)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(submitForm)} className="space-y-4">
+            {/* Property Title - Full Width */}
             <FormField
               control={form.control}
               name="propertyTitleId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="font-medium text-slate-700">Property Title</FormLabel>
+                  <FormLabel className="text-sm font-medium text-slate-700">Property Title</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
+                      <SelectTrigger className="h-9 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
                         <SelectValue placeholder="Select property title" />
                       </SelectTrigger>
                     </FormControl>
@@ -150,7 +151,7 @@ export function AddPropertyTaxDialog({ propertyTitles, users, currentUserId }: A
                       {propertyTitles.map((title) => (
                         <SelectItem key={title.id} value={title.id}>
                           <div className="flex flex-col">
-                            <span className="font-medium">{title.registeredOwner} — {title.titleNo} - Lot {title.lotNo}</span>
+                            <span className="font-medium text-sm">{title.registeredOwner} — {title.titleNo} - Lot {title.lotNo}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -161,213 +162,226 @@ export function AddPropertyTaxDialog({ propertyTitles, users, currentUserId }: A
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="taxYear"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-medium text-slate-700">Tax Year</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="2000" 
-                        className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="taxDecNo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-medium text-slate-700">Tax Declaration No.</FormLabel>
-                    <FormControl>
-                      <Input 
-                        className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            {/* Tax Details - Two Columns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="taxYear"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-slate-700">Tax Year</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="2000"
+                            className="h-9 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="taxDecNo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-slate-700">Tax Dec. No.</FormLabel>
+                        <FormControl>
+                          <Input 
+                            className="h-9 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-            <FormField
-              control={form.control}
-              name="taxAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-medium text-slate-700">Tax Amount (₱)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                <FormField
+                  control={form.control}
+                  name="taxAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-slate-700">Tax Amount (₱)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          className="h-9 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel className="text-sm font-medium text-slate-700">Due Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full h-9 pl-3 text-left font-normal border-slate-300 focus:border-blue-500 focus:ring-blue-500/20",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 bg-white border-slate-200" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
+                              date < new Date("1900-01-01")
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-4">
+                {/* Payment Type */}
+                <div className="space-y-3">
+                  <FormLabel className="text-sm font-medium text-slate-700">Payment Type</FormLabel>
+                  <div className="flex flex-col space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <FormField
+                      control={form.control}
+                      name="isAnnual"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                if (checked) {
+                                  form.setValue("isQuarterly", false);
+                                  form.setValue("whatQuarter", undefined);
+                                }
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="text-sm font-medium text-slate-700">Annual Payment</FormLabel>
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
-            <div className="flex space-x-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-              <FormField
-                control={form.control}
-                name="isAnnual"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={(checked) => {
-                          field.onChange(checked);
-                          if (checked) {
-                            form.setValue("isQuarterly", false);
-                            form.setValue("whatQuarter", undefined);
-                          }
-                        }}
-                      />
-                    </FormControl>
-                    <FormLabel className="font-medium text-slate-700">Annual Payment</FormLabel>
-                  </FormItem>
-                )}
-              />
+                    <FormField
+                      control={form.control}
+                      name="isQuarterly"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                if (checked) {
+                                  form.setValue("isAnnual", false);
+                                } else {
+                                  form.setValue("whatQuarter", undefined);
+                                }
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="text-sm font-medium text-slate-700">Quarterly Payment</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
-              <FormField
-                control={form.control}
-                name="isQuarterly"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={(checked) => {
-                          field.onChange(checked);
-                          if (checked) {
-                            form.setValue("isAnnual", false);
-                          } else {
-                            form.setValue("whatQuarter", undefined);
-                          }
-                        }}
-                      />
-                    </FormControl>
-                    <FormLabel className="font-medium text-slate-700">Quarterly Payment</FormLabel>
-                  </FormItem>
+                {watchIsQuarterly && (
+                  <FormField
+                    control={form.control}
+                    name="whatQuarter"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-slate-700">Quarter</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-9 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
+                              <SelectValue placeholder="Select quarter" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-white border-slate-200">
+                            <SelectItem value="1st Quarter">1st Quarter</SelectItem>
+                            <SelectItem value="2nd Quarter">2nd Quarter</SelectItem>
+                            <SelectItem value="3rd Quarter">3rd Quarter</SelectItem>
+                            <SelectItem value="4th Quarter">4th Quarter</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
+
+                <FormField
+                  control={form.control}
+                  name="processedBy"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-slate-700">Processed By</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-9 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
+                            <SelectValue placeholder="Select user (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-white border-slate-200">
+                          {users.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.firstName} {user.lastName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
-            {watchIsQuarterly && (
-              <FormField
-                control={form.control}
-                name="whatQuarter"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-medium text-slate-700">Quarter</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
-                          <SelectValue placeholder="Select quarter" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="bg-white border-slate-200">
-                        <SelectItem value="1st Quarter">1st Quarter</SelectItem>
-                        <SelectItem value="2nd Quarter">2nd Quarter</SelectItem>
-                        <SelectItem value="3rd Quarter">3rd Quarter</SelectItem>
-                        <SelectItem value="4th Quarter">4th Quarter</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <FormField
-              control={form.control}
-              name="dueDate"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel className="font-medium text-slate-700">Due Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal border-slate-300 focus:border-blue-500 focus:ring-blue-500/20",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 bg-white border-slate-200" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) =>
-                          date < new Date("1900-01-01")
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="processedBy"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-medium text-slate-700">Processed By (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
-                        <SelectValue placeholder="Select user" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-white border-slate-200">
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.firstName} {user.lastName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
+            {/* Remarks - Full Width */}
             <FormField
               control={form.control}
               name="remarks"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="font-medium text-slate-700">Remarks (Optional)</FormLabel>
+                  <FormLabel className="text-sm font-medium text-slate-700">Remarks</FormLabel>
                   <FormControl>
                     <Textarea 
-                      className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                      placeholder="Optional remarks or notes..."
+                      className="resize-none h-16 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
                       {...field} 
                     />
                   </FormControl>
@@ -376,7 +390,8 @@ export function AddPropertyTaxDialog({ propertyTitles, users, currentUserId }: A
               )}
             />
 
-            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-3 pt-3 border-t border-slate-100">
               <Button
                 type="button"
                 variant="outline"
@@ -385,16 +400,16 @@ export function AddPropertyTaxDialog({ propertyTitles, users, currentUserId }: A
                   form.reset();
                 }}
                 disabled={isSubmitting}
-                className="border-slate-300 hover:bg-slate-50"
+                className="px-4 py-2 h-9 border-slate-300 hover:bg-slate-50"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 disabled={isSubmitting}
-                className="min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white"
+                className="px-6 py-2 h-9 bg-blue-600 hover:bg-blue-700 text-white"
               >
-                {isSubmitting ? "Adding..." : "Add Tax Record"}
+                {isSubmitting ? "Adding..." : "Add Record"}
               </Button>
             </div>
           </form>

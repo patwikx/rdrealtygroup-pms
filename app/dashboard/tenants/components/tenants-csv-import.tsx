@@ -78,6 +78,7 @@ export function TenantCSVImport() {
       "email",
       "phone",
       "company",
+      "businessName",
       "status",
       "emergencyContactName",
       "emergencyContactPhone"

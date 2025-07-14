@@ -1,18 +1,15 @@
-import { Suspense } from 'react'
 import { prisma } from '@/lib/db'
 import { 
   Building2, 
   Users, 
   ClipboardList, 
-  AlertTriangle,
   ArrowUpRight,
   ArrowDownRight,
-  DollarSign,
   Home,
   PartyPopper
 } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
 import {
   Table,
   TableBody,
@@ -21,10 +18,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { OccupancyTrendChart } from '@/components/occupancy-trend-chart'
+
 import { calculateOpportunityLoss } from '@/lib/reports/opportunity-loss'
-import { formatCurrency } from '@/lib/utils'
 import { OpportunityLossCard } from '@/components/opportunity-loss-card'
+import { Metadata } from 'next'
+import CompactOccupancyTrendChart from '@/components/occupancy-trend-chart'
+
+export const metadata: Metadata = {
+  title: "RD Realty Group - Home",
+  description: "Manage and monitor all your properties, units, tenants, and maintenance requests in one place.",
+}
 
 // Server Actions
 async function getOverviewStats() {
@@ -77,23 +80,29 @@ async function getOverviewStats() {
         createdAt: 'desc'
       },
       include: {
-        unit: true,
+        unit: {
+          include: {
+            property: true
+          }
+        },
         tenant: true
       }
     }),
-    // Query to get total leasable area and occupied area
+    // Query to get total leasable area and occupied area using the updated schema
     prisma.$transaction([
-      prisma.property.aggregate({
+      // Get total area from all units (representing total leasable area)
+      prisma.unit.aggregate({
         _sum: {
-          leasableArea: true
+          totalArea: true
         }
       }),
+      // Get occupied area from occupied units
       prisma.unit.aggregate({
         where: {
           status: 'OCCUPIED'
         },
         _sum: {
-          unitArea: true
+          totalArea: true
         }
       })
     ]),
@@ -101,8 +110,8 @@ async function getOverviewStats() {
     calculateOpportunityLoss()
   ])
 
-  const totalLeasableArea = Number(occupancyMetrics[0]._sum.leasableArea) || 0
-  const totalOccupiedArea = Number(occupancyMetrics[1]._sum.unitArea) || 0
+  const totalLeasableArea = Number(occupancyMetrics[0]._sum.totalArea) || 0
+  const totalOccupiedArea = Number(occupancyMetrics[1]._sum.totalArea) || 0
 
   return {
     totalProperties,
@@ -215,6 +224,23 @@ async function getOccupancyTrends() {
   return occupancyData;
 }
 
+async function getUpcomingAnniversaries() {
+  const today = new Date()
+  const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
+  
+  const anniversaries = await prisma.lease.count({
+    where: {
+      status: 'ACTIVE',
+      startDate: {
+        gte: new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()),
+        lte: new Date(thirtyDaysFromNow.getFullYear() - 1, thirtyDaysFromNow.getMonth(), thirtyDaysFromNow.getDate())
+      }
+    }
+  })
+
+  return anniversaries
+}
+
 function StatCard({ 
   title, 
   value, 
@@ -230,8 +256,6 @@ function StatCard({
   trend?: 'up' | 'down'
   trendValue?: string
 }) {
-
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -280,10 +304,11 @@ function MaintenanceRequestTable({ requests }: { requests: any[] }) {
         {requests.map((request) => (
           <TableRow key={request.id}>
             <TableCell>
-              {request.unit.unitNumber}
+              <div className="font-medium">{request.unit?.property?.propertyName || 'Unknown Property'}</div>
+              <div className="text-sm text-muted-foreground">Unit {request.unit?.unitNumber || 'N/A'}</div>
             </TableCell>
             <TableCell>
-              {request.tenant.firstName} {request.tenant.lastName}
+              {request.tenant?.firstName} {request.tenant?.lastName}
             </TableCell>
             <TableCell>{request.category}</TableCell>
             <TableCell>
@@ -296,7 +321,16 @@ function MaintenanceRequestTable({ requests }: { requests: any[] }) {
                 {request.priority}
               </span>
             </TableCell>
-            <TableCell>{request.status}</TableCell>
+            <TableCell>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                request.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                request.status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800' :
+                request.status === 'IN_PROGRESS' ? 'bg-purple-100 text-purple-800' :
+                'bg-green-100 text-green-800'
+              }`}>
+                {request.status}
+              </span>
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -308,6 +342,7 @@ export default async function DashboardPage() {
   const stats = await getOverviewStats()
   const revenue = await getRevenueMetrics()
   const occupancyTrends = await getOccupancyTrends()
+  const upcomingAnniversaries = await getUpcomingAnniversaries()
   
   const revenueChange = revenue.currentMonthRevenue > revenue.lastMonthRevenue
   const revenueChangePercentage = revenue.lastMonthRevenue 
@@ -325,14 +360,8 @@ export default async function DashboardPage() {
         <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
       </div>
       
-      {/* Revenue Overview */}
+      {/* Main Overview Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Outstanding Payments"
-          value={formatCurrency(revenue.totalOutstandingAmount)}
-          icon={AlertTriangle}
-          description={`${stats.overduePayments} overdue payments`}
-        />
         <StatCard
           title="Total Properties"
           value={stats.totalProperties}
@@ -344,8 +373,16 @@ export default async function DashboardPage() {
           title="Occupancy Rate"
           value={`${occupancyRate}%`}
           icon={Home}
-          description={`${stats.totalOccupiedArea} / ${stats.totalLeasableArea} sqm occupied`}
+          description={`${Math.round(stats.totalOccupiedArea)} / ${Math.round(stats.totalLeasableArea)} sqm occupied`}
         />
+        
+        <StatCard
+          title="Vacant Units"
+          value={stats.vacantUnits}
+          icon={Building2}
+          description="Available for lease"
+        />
+        
         <OpportunityLossCard summary={stats.opportunityLoss} />
       </div>
 
@@ -371,21 +408,35 @@ export default async function DashboardPage() {
         />
         <StatCard
           title="Tenant Anniversaries"
-          value={stats.upcomingLeaseRenewals}
+          value={upcomingAnniversaries}
           icon={PartyPopper}
           description="Next 30 days"
         />
       </div>
 
       {/* Occupancy Trend Chart */}
-      <OccupancyTrendChart 
-        data={occupancyTrends.map(trend => ({
-          month: trend.month,
-          total: trend.total,
-          occupied: trend.occupied,
-          vacant: trend.total - trend.occupied
-        }))}
-      />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
+        <CompactOccupancyTrendChart
+          data={occupancyTrends.map(trend => ({
+            month: trend.month,
+            total: trend.total,
+            occupied: trend.occupied,
+            vacant: trend.total - trend.occupied
+          }))}
+        />
+      </div>
+
+      {/* Recent Maintenance Requests */}
+      {stats.recentMaintenanceRequests.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Maintenance Requests</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MaintenanceRequestTable requests={stats.recentMaintenanceRequests} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

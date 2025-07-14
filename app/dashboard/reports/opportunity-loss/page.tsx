@@ -10,6 +10,12 @@ import { OpportunityLossFilters } from './components/opportunity-loss-filters'
 import { OpportunityLossChart } from './components/oppotunity-loss-charts'
 import { VacancyDurationTable } from './components/vacancy-duration-table'
 import { OccupancyHistoryTable } from './components/occupancy-history-table'
+import { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: "RD Realty Group - Opportunity Loss Analysis",
+  description: "Manage vacancy durations and opportunity loss",
+}
 
 interface PageProps {
   searchParams: {
@@ -152,22 +158,41 @@ export default async function OpportunityLossPage({ searchParams }: PageProps) {
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>
-            Filter the opportunity loss data by property, status, and time period
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <OpportunityLossFilters 
+      <div>
+             <OpportunityLossFilters 
             properties={properties}
             currentFilters={searchParams}
             updateFilters={updateFilters}
             clearFilters={clearFilters}
           />
-        </CardContent>
-      </Card>
+      </div>
+
+            {/* Detailed Tables */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Vacant Space Detail</CardTitle>
+            <CardDescription>
+              Detailed breakdown of currently vacant spaces and their duration
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <VacancyDurationTable data={data.vacantUnits} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Occupancy History</CardTitle>
+            <CardDescription>
+              Historical occupancy patterns for all spaces this year
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <OccupancyHistoryTable data={data.occupancyHistory} />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -201,32 +226,7 @@ export default async function OpportunityLossPage({ searchParams }: PageProps) {
         </Card>
       </div>
 
-      {/* Detailed Tables */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Vacant Space Detail</CardTitle>
-            <CardDescription>
-              Detailed breakdown of currently vacant spaces and their duration
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <VacancyDurationTable data={data.vacantUnits} />
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Occupancy History</CardTitle>
-            <CardDescription>
-              Historical occupancy patterns for all spaces this year
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <OccupancyHistoryTable data={data.occupancyHistory} />
-          </CardContent>
-        </Card>
-      </div>
     </div>
   )
 }

@@ -1,4 +1,3 @@
-'use client';
 
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,12 @@ import { Plus, Download, UserPlus2 } from "lucide-react";
 import Link from "next/link";
 import { TenantListSkeleton } from "./components/tenants-list-skeletion";
 import { TenantList } from "./components/tenants-list";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "RD Realty Group - Tenants",
+  description: "Manage and monitor all your tenants in one place",
+}
 
 
 export default function TenantsPage() {

@@ -7,11 +7,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Search, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useAsync } from "@/hooks/use-async";
 import { useToast } from "@/components/ui/use-toast";
 import { TenantWithRelations } from "@/types";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { getTenants } from "@/actions/tenants";
+import { getTenants, getTenantById } from "@/actions/tenants";
 import { TenantListSkeleton } from "./tenants-list-skeletion";
 import { TenantBulkActions } from "./tenants-bulkd-action";
 import { TenantListItem } from "./tenants-list-items";
@@ -22,11 +21,12 @@ export function TenantList() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [tenants, setTenants] = useState<TenantWithRelations[]>([]);
+  const [selectedTenant, setSelectedTenant] = useState<TenantWithRelations | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingTenant, setIsLoadingTenant] = useState(false);
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("selected");
   const isMobile = useMediaQuery("(max-width: 768px)");
-  const router = useRouter();
   const { toast } = useToast();
 
   // Fetch tenants on component mount
@@ -50,14 +50,54 @@ export function TenantList() {
     fetchTenants();
   }, [toast]);
 
-  const selectedTenant = selectedId 
-    ? tenants.find(t => t.id === selectedId)
-    : null;
+  // Fetch selected tenant details when selectedId changes
+  useEffect(() => {
+    const fetchSelectedTenant = async () => {
+      if (!selectedId) {
+        setSelectedTenant(null);
+        return;
+      }
+
+      try {
+        setIsLoadingTenant(true);
+        // First try to find in existing tenants list
+        const existingTenant = tenants.find(t => t.id === selectedId);
+        if (existingTenant) {
+          setSelectedTenant(existingTenant);
+        } else {
+          // If not found, fetch from server
+          const tenantData = await getTenantById(selectedId);
+          if (tenantData) {
+            setSelectedTenant(tenantData);
+          } else {
+            setSelectedTenant(null);
+            toast({
+              title: "Error",
+              description: "Tenant not found",
+              variant: "destructive",
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching tenant:', error);
+        setSelectedTenant(null);
+        toast({
+          title: "Error",
+          description: "Failed to fetch tenant details",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingTenant(false);
+      }
+    };
+
+    fetchSelectedTenant();
+  }, [selectedId, tenants, toast]);
 
   const filteredTenants = tenants.filter((tenant) =>
-    tenant.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tenant.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tenant.bpCode.toLowerCase().includes(searchQuery.toLowerCase())
+    (tenant.firstName?.toLowerCase() ?? "").includes(searchQuery.toLowerCase()) ||
+    (tenant.lastName?.toLowerCase() ?? "").includes(searchQuery.toLowerCase()) ||
+    (tenant.bpCode?.toLowerCase() ?? "").includes(searchQuery.toLowerCase())
   );
 
   const handleSelectAll = (checked: boolean) => {
@@ -177,7 +217,14 @@ export function TenantList() {
             Back to List
           </Button>
         )}
-        {selectedTenant ? (
+        {isLoadingTenant ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center space-y-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-sm text-muted-foreground">Loading tenant details...</p>
+            </div>
+          </div>
+        ) : selectedTenant ? (
           <div className="p-4 md:p-6">
             <TenantDetails tenant={selectedTenant} />
           </div>

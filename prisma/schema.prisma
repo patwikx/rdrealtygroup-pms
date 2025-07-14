@@ -1,5 +1,11 @@
+//generator client {
+//provider = "prisma-client-js"
+//}
+
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // IMPORTANT: Change this from the 'musl' target
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
 }
 
 datasource db {
@@ -29,6 +35,7 @@ model User {
   assignedMaintenance MaintenanceRequest[] @relation("AssignedTo")
   uploadedDocuments   Document[]           @relation("UploadedBy")
   tenant              Tenant?
+  updatedPDCs         PDC[]                @relation("UpdatedBy")
 
   // Project Management Relations
   ownedProjects    Project[]               @relation("ProjectOwner")
@@ -38,12 +45,34 @@ model User {
   taskComments     TaskComment[]
   taskAttachments  TaskAttachment[]
   taskActivities   TaskActivity[]
-  titleMovements   PropertyTitleMovement[] // New relation
-  // Property Management Relations
+  titleMovements   PropertyTitleMovement[]
 
   // System Relations
   auditLogs     AuditLog[]
   notifications Notification[]
+}
+
+model PDC {
+  id          String    @id @default(cuid())
+  docDate     DateTime  @default(now())
+  refNo       String
+  bankName    String
+  dueDate     DateTime
+  checkNo     String
+  amount      Float
+  remarks     String?
+  bpCode      String
+  bpName      String
+  updatedById String
+  status      PDCStatus @default(Open)
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  tenant    Tenant @relation(fields: [bpCode], references: [bpCode])
+  updatedBy User   @relation("UpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([bpCode])
+  @@index([updatedById])
 }
 
 // NextAuth required models
@@ -239,7 +268,7 @@ model Property {
   documents      Document[]
   utilities      PropertyUtility[]
   titleMovements PropertyTitleMovement[]
-  titles         PropertyTitles[] // New one-to-many relation to titles
+  titles         PropertyTitles[]
 }
 
 model PropertyTitles {
@@ -256,13 +285,12 @@ model PropertyTitles {
 
   // RELATIONS
   property      Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  propertyTaxes PropertyTax[] // Relation to RPTs
-  units         Unit[] // NEW: One-to-many relation to units
+  propertyTaxes PropertyTax[]
+  units         Unit[]
 
   @@index([propertyId])
 }
 
-// New model for tracking property title movements
 model PropertyTitleMovement {
   id          String              @id @default(cuid())
   propertyId  String
@@ -286,7 +314,7 @@ model PropertyTitleMovement {
 
 model PropertyTax {
   id              String    @id @default(cuid())
-  propertyTitleId String // Changed from propertyId
+  propertyTitleId String
   taxYear         Int
   TaxDecNo        String
   taxAmount       Float
@@ -303,37 +331,49 @@ model PropertyTax {
   updatedAt       DateTime  @updatedAt
 
   // Relations
-  propertyTitle PropertyTitles @relation(fields: [propertyTitleId], references: [id], onDelete: Cascade) // Relation changed to PropertyTitles
+  propertyTitle PropertyTitles @relation(fields: [propertyTitleId], references: [id], onDelete: Cascade)
 }
 
 model Unit {
   id              String     @id @default(cuid())
   propertyId      String
-  propertyTitleId String? // Optional relation to PropertyTitles
-  unitNumber      String     @unique
-  unitArea        Float
-  unitRate        Float
-  rentAmount      Float
-  isFirstFloor    Boolean    @default(false)
-  isSecondFloor   Boolean    @default(false)
-  isThirdFloor    Boolean    @default(false)
-  isRoofTop       Boolean    @default(false)
-  isMezzanine     Boolean    @default(false)
+  propertyTitleId String?
+  unitNumber      String
+  totalArea       Float
+  totalRent       Float
   status          UnitStatus
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
   // Relations
   property            Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  propertyTitle       PropertyTitles?      @relation(fields: [propertyTitleId], references: [id], onDelete: SetNull) // NEW: Relation to PropertyTitles
-  leases              Lease[]
+  propertyTitle       PropertyTitles?      @relation(fields: [propertyTitleId], references: [id], onDelete: SetNull)
+  unitFloors          UnitFloor[]
+  leaseUnits          LeaseUnit[]          @relation("UnitLeases") // Changed from direct lease relation
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
   unitTaxes           UnitTax[]
   utilityAccounts     UnitUtilityAccount[]
 
   @@unique([propertyId, unitNumber])
-  @@index([propertyTitleId]) // NEW: Index for better query performance
+  @@index([propertyTitleId])
+}
+
+model UnitFloor {
+  id        String    @id @default(cuid())
+  unitId    String
+  floorType FloorType
+  area      Float
+  rate      Float
+  rent      Float
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, floorType])
+  @@index([unitId])
 }
 
 model UnitTax {
@@ -414,14 +454,14 @@ model Tenant {
   id                    String       @id @default(cuid())
   userId                String?      @unique
   bpCode                String       @unique
-  firstName             String
-  lastName              String
+  firstName             String?
+  lastName              String?
   email                 String
   phone                 String
   emergencyContactName  String?
   emergencyContactPhone String?
   company               String
-  businessName          String?
+  businessName          String
   status                TenantStatus
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
@@ -429,18 +469,19 @@ model Tenant {
 
   // Relations
   user                User?                @relation(fields: [userId], references: [id])
-  leases              Lease[]
+  leases              Lease[]              @relation("TenantLeases") // Updated relation name
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
+  pdcs                PDC[]
 }
 
+// Updated Lease model to support multiple units
 model Lease {
   id                String      @id @default(cuid())
-  unitId            String
   tenantId          String
   startDate         DateTime
   endDate           DateTime
-  rentAmount        Float
+  totalRentAmount   Float // Total rent for all units
   securityDeposit   Float
   status            LeaseStatus @default(PENDING)
   terminationDate   DateTime?
@@ -449,9 +490,27 @@ model Lease {
   updatedAt         DateTime    @updatedAt
 
   // Relations
-  unit     Unit      @relation(fields: [unitId], references: [id])
-  tenant   Tenant    @relation(fields: [tenantId], references: [id])
-  payments Payment[]
+  tenant     Tenant      @relation("TenantLeases", fields: [tenantId], references: [id])
+  leaseUnits LeaseUnit[] @relation("LeaseUnits") // Many-to-many with units
+  payments   Payment[]
+}
+
+// Junction table for Lease-Unit many-to-many relationship
+model LeaseUnit {
+  id         String   @id @default(cuid())
+  leaseId    String
+  unitId     String
+  rentAmount Float // Individual rent for this unit
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  lease Lease @relation("LeaseUnits", fields: [leaseId], references: [id], onDelete: Cascade)
+  unit  Unit  @relation("UnitLeases", fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([leaseId, unitId]) // Prevent duplicate unit assignments to same lease
+  @@index([leaseId])
+  @@index([unitId])
 }
 
 model MaintenanceRequest {
@@ -744,11 +803,26 @@ enum NotificationPriority {
   URGENT
 }
 
-// Add new enum for title movement status
 enum TitleMovementStatus {
   REQUESTED
   RELEASED
   RETURNED
   IN_TRANSIT
   LOST
+}
+
+enum PDCStatus {
+  Open
+  Deposited
+  RETURNED
+  Bounced
+  Cancelled
+}
+
+enum FloorType {
+  GROUND_FLOOR
+  MEZZANINE
+  SECOND_FLOOR
+  THIRD_FLOOR
+  ROOF_TOP
 }

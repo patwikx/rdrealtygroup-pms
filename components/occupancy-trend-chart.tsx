@@ -1,8 +1,8 @@
 "use client"
 
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, CartesianGrid } from "recharts"
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Building2, DoorClosed, DoorOpen, Home } from "lucide-react"
+import { DoorClosed, DoorOpen, Home } from "lucide-react"
 
 interface OccupancyTrendChartProps {
   data: {
@@ -13,139 +13,81 @@ interface OccupancyTrendChartProps {
   }[]
 }
 
-export function OccupancyTrendChart({ data }: OccupancyTrendChartProps) {
+export default function CompactOccupancyTrendChart({ data }: OccupancyTrendChartProps) {
+  const latestData = data[data.length - 1]
+
   return (
     <Card className="col-span-4">
-      <CardHeader>
-        <CardTitle>Space Occupancy Trend</CardTitle>
-        <CardDescription>
-          Monthly breakdown of occupied and vacant spaces
-        </CardDescription>
+      <CardHeader className="p-4">
+        <CardTitle className="text-lg">Space Occupancy Trend</CardTitle>
+        <CardDescription>Monthly occupied vs. vacant spaces</CardDescription>
       </CardHeader>
-      <CardContent className="pl-2">
-        <ResponsiveContainer width="100%" height={400}>
-          <LineChart 
+      <CardContent className="p-0 pl-2">
+        <ResponsiveContainer width="100%" height={220}>
+          <LineChart
             data={data}
-            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            margin={{ top: 10, right: 20, left: -10, bottom: 0 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis
               dataKey="month"
               stroke="#888888"
-              fontSize={12}
+              fontSize={10}
               tickLine={false}
               axisLine={false}
             />
             <YAxis
               stroke="#888888"
-              fontSize={12}
+              fontSize={10}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(value) => `${value.toLocaleString()} spaces`}
+              tickFormatter={(value) => `${value / 1000}k`}
             />
-            <Tooltip 
-              formatter={(value: number, name: string) => {
-                const formattedValue = value.toLocaleString();
-                switch(name) {
-                  case 'occupied':
-                    return [`${formattedValue} spaces`, 'Occupied Spaces'];
-                  case 'vacant':
-                    return [`${formattedValue} spaces`, 'Vacant Spaces'];
-                  case 'total':
-                    return [`${formattedValue} spaces`, 'Total Spaces'];
-                  default:
-                    return [formattedValue, name];
-                }
-              }}
+            <Tooltip
               contentStyle={{
-                backgroundColor: 'white',
-                border: '1px solid #e2e8f0',
+                fontSize: '12px',
+                padding: '4px 8px',
                 borderRadius: '6px',
-                padding: '8px'
+                border: '1px solid #e2e8f0',
+              }}
+              labelStyle={{ fontWeight: 'bold' }}
+              formatter={(value: number, name: string) => {
+                const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+                return [value.toLocaleString(), capitalizedName];
               }}
             />
-            <Legend 
-              verticalAlign="top" 
-              height={36}
-              formatter={(value) => {
-                switch(value) {
-                  case 'occupied':
-                    return 'Occupied Spaces';
-                  case 'vacant':
-                    return 'Vacant Spaces';
-                  case 'total':
-                    return 'Total Spaces';
-                  default:
-                    return value;
-                }
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey="total"
-              stroke="#6b7280"
-              strokeWidth={2}
-              dot={{
-                stroke: '#6b7280',
-                strokeWidth: 2,
-                r: 4,
-                fill: 'white'
-              }}
-              strokeDasharray="3 3"
-            />
-            <Line
-              type="monotone"
-              dataKey="occupied"
-              stroke="#16a34a"
-              strokeWidth={2}
-              dot={{
-                stroke: '#16a34a',
-                strokeWidth: 2,
-                r: 4,
-                fill: 'white'
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey="vacant"
-              stroke="#dc2626"
-              strokeWidth={2}
-              dot={{
-                stroke: '#dc2626',
-                strokeWidth: 2,
-                r: 4,
-                fill: 'white'
-              }}
-            />
+            <Line type="monotone" dataKey="total" stroke="#6b7280" strokeWidth={2} dot={false} strokeDasharray="3 3" />
+            <Line type="monotone" dataKey="occupied" stroke="#16a34a" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="vacant" stroke="#dc2626" strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center p-4 border rounded-lg bg-secondary/5">
-            <Home className="h-5 w-5 text-muted-foreground mr-3" />
+
+        <div className="mt-2 grid grid-cols-3 gap-2 px-4 pb-4">
+          <div className="flex items-center space-x-2 rounded-lg border bg-secondary/30 p-2">
+            <Home className="h-4 w-4 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Spaces</p>
-              <p className="text-2xl font-bold">
-                {data[data.length - 1]?.total.toLocaleString()}
+              <p className="text-xs font-medium text-muted-foreground">Total</p>
+              <p className="text-base font-bold">
+                {latestData?.total.toLocaleString()}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center p-4 border rounded-lg bg-emerald-50">
-            <DoorOpen className="h-5 w-5 text-emerald-600 mr-3" />
+          <div className="flex items-center space-x-2 rounded-lg border bg-emerald-50 p-2">
+            <DoorOpen className="h-4 w-4 text-emerald-600" />
             <div>
-              <p className="text-sm font-medium text-emerald-600">Occupied Spaces</p>
-              <p className="text-2xl font-bold text-emerald-600">
-                {data[data.length - 1]?.occupied.toLocaleString()}
+              <p className="text-xs font-medium text-emerald-600">Occupied</p>
+              <p className="text-base font-bold text-emerald-600">
+                {latestData?.occupied.toLocaleString()}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center p-4 border rounded-lg bg-red-50">
-            <DoorClosed className="h-5 w-5 text-red-600 mr-3" />
+          <div className="flex items-center space-x-2 rounded-lg border bg-red-50 p-2">
+            <DoorClosed className="h-4 w-4 text-red-600" />
             <div>
-              <p className="text-sm font-medium text-red-600">Vacant Spaces</p>
-              <p className="text-2xl font-bold text-red-600">
-                {data[data.length - 1]?.vacant.toLocaleString()}
+              <p className="text-xs font-medium text-red-600">Vacant</p>
+              <p className="text-base font-bold text-red-600">
+                {latestData?.vacant.toLocaleString()}
               </p>
             </div>
           </div>

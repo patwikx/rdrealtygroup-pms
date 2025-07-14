@@ -12,6 +12,7 @@ import { ExportButtons } from './components/export-buttons';
 import { AuditLogsFilters } from './components/audit-logs-filter';
 import { AuditLogsTable } from './components/audit-logs-table';
 
+
 const initialFilters: AuditLogFilters = {
   page: 1,
   limit: 50,

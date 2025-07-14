@@ -28,8 +28,9 @@ export function useTenants(initialTenants: Tenant[]) {
     if (debouncedSearch) {
       const searchLower = debouncedSearch.toLowerCase();
       filtered = filtered.filter(tenant =>
-        tenant.firstName.toLowerCase().includes(searchLower) ||
-        tenant.lastName.toLowerCase().includes(searchLower) ||
+        tenant.bpCode.toLowerCase().includes(searchLower) ||
+        tenant.company.toLowerCase().includes(searchLower) ||
+        tenant.businessName.toLowerCase().includes(searchLower) ||
         tenant.email.toLowerCase().includes(searchLower) ||
         tenant.bpCode.toLowerCase().includes(searchLower)
       );

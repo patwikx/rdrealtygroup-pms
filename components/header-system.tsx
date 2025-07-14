@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import {  Building2,  Users,  FileText, Settings, Menu, HelpCircle,LucideLandmark, Notebook } from "lucide-react"
+import {  Building2,  Users,  FileText, Settings, Menu, HelpCircle,LucideLandmark, Notebook, LogOut, LockKeyhole, LockKeyholeOpen, CreditCardIcon } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import {
   DropdownMenu,
@@ -47,6 +47,11 @@ const navigation = [
     name: "Projects",
     href: "/dashboard/projects",
     icon: FileText,
+  },
+  {
+    name: "Credit & Collection",
+    href: "/dashboard/pdc-monitoring",
+    icon: CreditCardIcon,  
   },
   {
     name: "Audit Logs",
@@ -139,22 +144,40 @@ export function Header({ user }: HeaderProps) {
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.name}</p>
-                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuItem>Help & Support</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
-                Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
+<DropdownMenuContent align="end" className="w-56">
+  <DropdownMenuLabel className="font-normal">
+    {/* This is the new container for text and the avatar */}
+    <div className="flex items-center justify-between space-x-2">
+      <div className="flex flex-col space-y-1">
+        <p className="text-sm font-medium leading-none">{user?.name}</p>
+        <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+      </div>
+      {/* The Avatar component for the profile picture */}
+      <Avatar className="h-10 w-10">
+        <AvatarImage src={user?.image} alt="User profile picture" />
+        <AvatarFallback>{user?.name?.charAt(0).toUpperCase()}</AvatarFallback>
+      </Avatar>
+    </div>
+  </DropdownMenuLabel>
+  <DropdownMenuSeparator />
+  <DropdownMenuItem className="flex justify-between items-center">
+    <span>Profile</span>
+    <Users className="h-4 w-4 ml-2" />
+  </DropdownMenuItem>
+  <DropdownMenuItem className="flex justify-between items-center">
+    <span>Settings</span>
+    <Settings className="h-4 w-4 ml-2" />
+  </DropdownMenuItem>
+  <DropdownMenuItem className="flex justify-between items-center">
+    <span>Change Password</span>
+    <LockKeyholeOpen className="h-4 w-4 ml-2" />
+  </DropdownMenuItem>
+  <DropdownMenuSeparator />
+  <DropdownMenuItem className="text-red-600 flex justify-between items-center" onClick={handleLogout}>
+    <span>Log out</span>
+    <LogOut className="h-4 w-4 ml-2" />
+  </DropdownMenuItem>
+</DropdownMenuContent>
           </DropdownMenu>
 
           {/* Mobile menu */}

@@ -1,6 +1,16 @@
 import { prisma } from '@/lib/db'
-import { addDays, differenceInDays, startOfYear, endOfYear, eachMonthOfInterval, format } from 'date-fns'
+import {
+  addDays,
+  differenceInDays,
+  startOfYear,
+  endOfYear,
+  eachMonthOfInterval,
+  format,
+  max,
+  parseISO,
+} from 'date-fns'
 
+// The data structure for the final output, unchanged.
 export interface OpportunityLossData {
   summary: {
     totalMonthlyLoss: number
@@ -59,236 +69,267 @@ export interface OpportunityLossData {
   }>
 }
 
-export async function getOpportunityLossData(filters: {
-  propertyId?: string
-  unitStatus?: string
-  vacancyDuration?: string
-  dateRange?: string
-} = {}): Promise<OpportunityLossData> {
-  const currentYear = new Date().getFullYear()
-  const yearStart = startOfYear(new Date(currentYear, 0, 1))
-  const yearEnd = endOfYear(new Date(currentYear, 11, 31))
-  
-  // Build where conditions based on filters
-  const whereConditions: any = {}
-  
+/**
+ * Analyzes property data to calculate opportunity loss from vacant units.
+ * @param filters - Optional filters for the analysis.
+ * @returns A detailed report on opportunity loss.
+ */
+export async function getOpportunityLossData(
+  filters: {
+    propertyId?: string
+    unitStatus?: string
+    vacancyDuration?: string
+    dateRange?: string // Expects a string like "YYYY-MM-DD to YYYY-MM-DD"
+  } = {}
+): Promise<OpportunityLossData> {
+  // --- 1. SETUP: Define analysis window and Prisma query conditions ---
+
+  const now = new Date()
+  // Define the analysis period. Use the filter if provided, otherwise default to the current year.
+  const analysisStart = filters.dateRange
+    ? parseISO(filters.dateRange.split(' to ')[0])
+    : startOfYear(now)
+  const analysisEnd = filters.dateRange
+    ? parseISO(filters.dateRange.split(' to ')[1])
+    : endOfYear(now)
+
+  // Build Prisma WHERE conditions based on filters.
+  const whereConditions: any = {
+    // We analyze units created before the end of our analysis period.
+    createdAt: {
+      lte: analysisEnd,
+    },
+  }
   if (filters.propertyId) {
     whereConditions.propertyId = filters.propertyId
   }
-  
   if (filters.unitStatus) {
     whereConditions.status = filters.unitStatus
   }
 
-  // Get all units with their properties
-  const units = await prisma.unit.findMany({
+  // --- 2. DATA FETCHING: Get all relevant units and their lease history ---
+
+  const allUnits = await prisma.unit.findMany({
     where: whereConditions,
     include: {
       property: true,
-      leases: {
-        orderBy: {
-          startDate: 'asc'
-        },
+      // FIX: Correctly include leases through the LeaseUnit junction table.
+      leaseUnits: {
         include: {
-          tenant: true
-        }
-      }
-    }
+          lease: {
+            include: {
+              tenant: true,
+            },
+          },
+        },
+        // We only need leases that overlap with our analysis period.
+        where: {
+          lease: {
+            OR: [
+              { startDate: { lte: analysisEnd } },
+              { endDate: { gte: analysisStart } },
+            ],
+          },
+        },
+      },
+    },
   })
 
-  // Calculate vacancy and occupancy periods for each unit
-  const unitAnalysis = await Promise.all(
-    units.map(async (unit) => {
-      const occupancyPeriods = []
-      const vacancyPeriods = []
-      
-      // Sort leases by start date
-      const sortedLeases = unit.leases.sort((a, b) => 
-        new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+  // --- 3. CORE ANALYSIS: Calculate occupancy and vacancy timelines for each unit ---
+
+  const unitAnalysis = allUnits.map(unit => {
+    const occupancyPeriods = []
+    const vacancyPeriods = []
+
+    // Map LeaseUnit data to a simpler, sorted lease structure.
+    const sortedLeases = unit.leaseUnits
+      .map(lu => lu.lease)
+      .sort(
+        (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
       )
-      
-      let currentDate = yearStart
-      
-      for (const lease of sortedLeases) {
-        const leaseStart = new Date(lease.startDate)
-        const leaseEnd = new Date(lease.endDate)
-        
-        // If there's a gap before this lease, it's a vacancy period
-        if (leaseStart > currentDate) {
-          vacancyPeriods.push({
-            startDate: currentDate,
-            endDate: leaseStart,
-            duration: differenceInDays(leaseStart, currentDate)
-          })
-        }
-        
-        // Add the occupancy period
-        if (leaseEnd >= yearStart && leaseStart <= yearEnd) {
-          const periodStart = leaseStart < yearStart ? yearStart : leaseStart
-          const periodEnd = leaseEnd > yearEnd ? yearEnd : leaseEnd
-          
-          occupancyPeriods.push({
-            startDate: periodStart,
-            endDate: periodEnd,
-            duration: differenceInDays(periodEnd, periodStart),
-            tenantName: `${lease.tenant.firstName} ${lease.tenant.lastName}`
-          })
-        }
-        
-        currentDate = leaseEnd > currentDate ? leaseEnd : currentDate
-      }
-      
-      // If there's time remaining after all leases, it's a vacancy period
-      if (currentDate < yearEnd) {
+
+    // Start tracking time from the unit's creation date or the analysis start, whichever is later.
+    let lastEventDate = max([new Date(unit.createdAt), analysisStart])
+
+    for (const lease of sortedLeases) {
+      const leaseStart = new Date(lease.startDate)
+      const leaseEnd = new Date(lease.endDate)
+
+      // A) Calculate vacancy period before this lease starts.
+      if (leaseStart > lastEventDate) {
         vacancyPeriods.push({
-          startDate: currentDate,
-          endDate: yearEnd,
-          duration: differenceInDays(yearEnd, currentDate)
+          startDate: lastEventDate,
+          endDate: leaseStart,
+          duration: differenceInDays(leaseStart, lastEventDate),
+        })
+      }
+
+      // B) Calculate occupancy period for the duration of this lease.
+      // We clamp the period to be within our analysis window.
+      const effectiveStart = max([leaseStart, lastEventDate, analysisStart])
+      const effectiveEnd = leaseEnd < analysisEnd ? leaseEnd : analysisEnd
+
+      if (effectiveEnd > effectiveStart) {
+        occupancyPeriods.push({
+          startDate: effectiveStart,
+          endDate: effectiveEnd,
+          duration: differenceInDays(effectiveEnd, effectiveStart) + 1, // Inclusive
+          tenantName: `${lease.tenant.firstName ?? ''} ${lease.tenant.lastName ?? ''}`.trim(),
         })
       }
       
-      // Calculate yearly stats
-      const totalOccupiedDays = occupancyPeriods.reduce((sum, period) => sum + period.duration, 0)
-      const totalVacantDays = vacancyPeriods.reduce((sum, period) => sum + period.duration, 0)
-      const totalDaysInYear = differenceInDays(yearEnd, yearStart)
-      const occupancyRate = totalDaysInYear > 0 ? (totalOccupiedDays / totalDaysInYear) * 100 : 0
-      const lostRevenue = (totalVacantDays / 30) * Number(unit.rentAmount)
-      
-      return {
-        unit,
-        occupancyPeriods,
-        vacancyPeriods,
-        yearlyStats: {
-          totalOccupiedDays,
-          totalVacantDays,
-          occupancyRate,
-          lostRevenue
-        }
-      }
-    })
-  )
+      // Move our time tracker to the end of this lease.
+      lastEventDate = addDays(leaseEnd, 1)
+    }
 
-  // Get currently vacant units
-  const vacantUnits = units.filter(unit => unit.status === 'VACANT')
-  
-  // Calculate vacancy duration for currently vacant units
-  const vacantUnitsWithDuration = await Promise.all(
-    vacantUnits.map(async (unit) => {
-      // Find the last lease end date or creation date if no leases
-      const lastLease = unit.leases
-        .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0]
+    // C) Calculate final vacancy period from the last lease end to the analysis end.
+    if (lastEventDate < analysisEnd) {
+      vacancyPeriods.push({
+        startDate: lastEventDate,
+        endDate: analysisEnd,
+        duration: differenceInDays(analysisEnd, lastEventDate) + 1, // Inclusive
+      })
+    }
+
+    // Calculate yearly stats for this specific unit.
+    const totalOccupiedDays = occupancyPeriods.reduce((sum, p) => sum + p.duration, 0)
+    const totalVacantDays = vacancyPeriods.reduce((sum, p) => sum + p.duration, 0)
+    const totalDaysInPeriod = differenceInDays(analysisEnd, analysisStart) + 1
+    const occupancyRate = totalDaysInPeriod > 0 ? (totalOccupiedDays / totalDaysInPeriod) * 100 : 0
+    // FIX: Use `totalRent` for loss calculation and calculate daily rate.
+    const dailyRent = (unit.totalRent || 0) / 30.44 // Average days in a month
+    const lostRevenue = totalVacantDays * dailyRent
+
+    return {
+      unit,
+      occupancyPeriods,
+      vacancyPeriods,
+      yearlyStats: {
+        totalOccupiedDays,
+        totalVacantDays,
+        occupancyRate,
+        lostRevenue,
+      },
+    }
+  })
+
+  // --- 4. VACANT UNIT ANALYSIS: Detail currently vacant units ---
+
+  const vacantUnitsWithDetails = unitAnalysis
+    .filter(ua => ua.unit.status === 'VACANT')
+    .map(ua => {
+      // Find the end date of the very last lease, or fall back to unit creation date.
+      const lastLeaseEnd = ua.vacancyPeriods.length > 0
+        ? ua.vacancyPeriods[ua.vacancyPeriods.length - 1].startDate
+        : new Date(ua.unit.createdAt);
+
+      const vacancyStartDate = lastLeaseEnd;
+      const vacancyDuration = differenceInDays(now, vacancyStartDate)
       
-      const vacancyStartDate = lastLease ? new Date(lastLease.endDate) : new Date(unit.createdAt)
-      const vacancyDuration = differenceInDays(new Date(), vacancyStartDate)
-      const monthlyLoss = Number(unit.rentAmount)
+      // FIX: Use correct field names from schema (`totalRent`, `totalArea`).
+      const monthlyLoss = ua.unit.totalRent ?? 0
       const annualLoss = monthlyLoss * 12
-      
+
       return {
-        id: unit.id,
-        unitNumber: unit.unitNumber,
-        propertyName: unit.property.propertyName,
-        unitArea: Number(unit.unitArea),
-        rentAmount: Number(unit.rentAmount),
+        id: ua.unit.id,
+        unitNumber: ua.unit.unitNumber,
+        propertyName: ua.unit.property.propertyName,
+        unitArea: ua.unit.totalArea ?? 0,
+        rentAmount: ua.unit.totalRent ?? 0,
         vacancyStartDate,
         vacancyDuration,
         monthlyLoss,
         annualLoss,
-        status: unit.status
+        status: ua.unit.status,
       }
     })
-  )
 
-  // Apply vacancy duration filter
-  let filteredVacantUnits = vacantUnitsWithDuration
+  // Apply the vacancy duration filter if provided.
+  let filteredVacantUnits = vacantUnitsWithDetails
   if (filters.vacancyDuration) {
-    const [min, max] = filters.vacancyDuration.includes('+') 
-      ? [parseInt(filters.vacancyDuration), Infinity]
+    const [min, max] = filters.vacancyDuration.includes('+')
+      ? [parseInt(filters.vacancyDuration, 10), Infinity]
       : filters.vacancyDuration.split('-').map(Number)
-    
-    filteredVacantUnits = vacantUnitsWithDuration.filter(unit => {
+
+    filteredVacantUnits = vacantUnitsWithDetails.filter(unit => {
       if (max === Infinity) return unit.vacancyDuration >= min
       return unit.vacancyDuration >= min && unit.vacancyDuration <= max
     })
   }
 
-  // Calculate summary statistics
-  const totalVacantUnits = filteredVacantUnits.length
-  const totalVacantArea = filteredVacantUnits.reduce((sum, unit) => sum + unit.unitArea, 0)
-  const totalMonthlyLoss = filteredVacantUnits.reduce((sum, unit) => sum + unit.monthlyLoss, 0)
-  const totalAnnualLoss = totalMonthlyLoss * 12
-  const avgVacancyDuration = totalVacantUnits > 0 
-    ? Math.round(filteredVacantUnits.reduce((sum, unit) => sum + unit.vacancyDuration, 0) / totalVacantUnits)
-    : 0
-  const longestVacancy = filteredVacantUnits.length > 0
-    ? Math.max(...filteredVacantUnits.map(unit => unit.vacancyDuration))
-    : 0
-  
-  const totalUnits = units.length
-  const occupancyRate = totalUnits > 0 
-    ? ((totalUnits - totalVacantUnits) / totalUnits) * 100
-    : 0
+  // --- 5. AGGREGATION & SUMMARY: Calculate final metrics ---
 
-  // Generate monthly trends
-  const monthlyTrends = eachMonthOfInterval({
-    start: yearStart,
-    end: new Date()
-  }).map(month => {
-    const monthStart = new Date(month.getFullYear(), month.getMonth(), 1)
-    const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0)
-    
-    // Calculate vacancy for this month
-    const vacantInMonth = unitAnalysis.filter(({ unit, vacancyPeriods }) => 
-      vacancyPeriods.some(period => 
-        period.startDate <= monthEnd && 
-        (period.endDate === null || period.endDate >= monthStart)
+  const totalVacantUnits = filteredVacantUnits.length
+  const totalVacantArea = filteredVacantUnits.reduce((sum, u) => sum + u.unitArea, 0)
+  const totalMonthlyLoss = filteredVacantUnits.reduce((sum, u) => sum + u.monthlyLoss, 0)
+  const totalAnnualLoss = totalMonthlyLoss * 12
+  const totalVacancyDuration = filteredVacantUnits.reduce((sum, u) => sum + u.vacancyDuration, 0)
+  const avgVacancyDuration = totalVacantUnits > 0 ? Math.round(totalVacancyDuration / totalVacantUnits) : 0
+  const longestVacancy = Math.max(0, ...filteredVacantUnits.map(u => u.vacancyDuration))
+  
+  const totalUnitsCount = allUnits.length
+  const occupancyRate = totalUnitsCount > 0 ? ((totalUnitsCount - totalVacantUnits) / totalUnitsCount) * 100 : 0
+
+  // --- 6. TRENDS & DISTRIBUTION: Format data for charts ---
+
+  // Monthly trends based on historical vacancy periods.
+  const monthlyTrends = eachMonthOfInterval({ start: analysisStart, end: analysisEnd }).map(month => {
+    const monthStart = startOfYear(month)
+    const monthEnd = endOfYear(month)
+
+    let monthlyLoss = 0
+    let vacantInMonthCount = 0
+    let vacantAreaInMonth = 0
+
+    unitAnalysis.forEach(({ unit, vacancyPeriods }) => {
+      const isVacantThisMonth = vacancyPeriods.some(
+        p => new Date(p.startDate) <= monthEnd && new Date(p.endDate) >= monthStart
       )
-    )
-    
-    const monthlyLoss = vacantInMonth.reduce((sum, { unit }) => sum + Number(unit.rentAmount), 0)
-    const vacantArea = vacantInMonth.reduce((sum, { unit }) => sum + Number(unit.unitArea), 0)
-    
+      if (isVacantThisMonth) {
+        monthlyLoss += unit.totalRent ?? 0
+        vacantInMonthCount++
+        vacantAreaInMonth += unit.totalArea ?? 0
+      }
+    })
+
     return {
       month: format(month, 'MMM yyyy'),
       loss: monthlyLoss,
-      vacantUnits: vacantInMonth.length,
-      vacantArea
+      vacantUnits: vacantInMonthCount,
+      vacantArea: vacantAreaInMonth,
     }
   })
 
-  // Generate vacancy distribution
+  // Vacancy duration distribution for currently vacant units.
   const vacancyDistribution = [
     { range: '0-30 days', count: 0 },
     { range: '31-60 days', count: 0 },
     { range: '61-90 days', count: 0 },
     { range: '91-180 days', count: 0 },
-    { range: '181+ days', count: 0 }
+    { range: '181+ days', count: 0 },
   ]
-  
   filteredVacantUnits.forEach(unit => {
-    if (unit.vacancyDuration <= 30) {
-      vacancyDistribution[0].count++
-    } else if (unit.vacancyDuration <= 60) {
-      vacancyDistribution[1].count++
-    } else if (unit.vacancyDuration <= 90) {
-      vacancyDistribution[2].count++
-    } else if (unit.vacancyDuration <= 180) {
-      vacancyDistribution[3].count++
-    } else {
-      vacancyDistribution[4].count++
-    }
+    const d = unit.vacancyDuration
+    if (d <= 30) vacancyDistribution[0].count++
+    else if (d <= 60) vacancyDistribution[1].count++
+    else if (d <= 90) vacancyDistribution[2].count++
+    else if (d <= 180) vacancyDistribution[3].count++
+    else vacancyDistribution[4].count++
   })
 
-  // Format occupancy history
-  const occupancyHistory = unitAnalysis.map(({ unit, occupancyPeriods, vacancyPeriods, yearlyStats }) => ({
-    id: unit.id,
-    unitNumber: unit.unitNumber,
-    propertyName: unit.property.propertyName,
-    unitArea: Number(unit.unitArea),
-    rentAmount: Number(unit.rentAmount),
-    occupancyPeriods,
-    vacancyPeriods,
-    yearlyStats
+  // Format the final occupancy history structure.
+  const occupancyHistory = unitAnalysis.map(ua => ({
+    id: ua.unit.id,
+    unitNumber: ua.unit.unitNumber,
+    propertyName: ua.unit.property.propertyName,
+    unitArea: ua.unit.totalArea ?? 0,
+    rentAmount: ua.unit.totalRent ?? 0,
+    occupancyPeriods: ua.occupancyPeriods,
+    vacancyPeriods: ua.vacancyPeriods,
+    yearlyStats: ua.yearlyStats,
   }))
+
+  // --- 7. RETURN: Assemble the final data object ---
 
   return {
     summary: {
@@ -298,11 +339,11 @@ export async function getOpportunityLossData(filters: {
       totalVacantArea,
       avgVacancyDuration,
       longestVacancy,
-      occupancyRate
+      occupancyRate,
     },
     monthlyTrends,
     vacancyDistribution,
     vacantUnits: filteredVacantUnits,
-    occupancyHistory
+    occupancyHistory,
   }
 }

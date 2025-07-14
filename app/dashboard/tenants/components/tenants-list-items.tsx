@@ -35,21 +35,22 @@ export function TenantListItem({
 
   if (isLoading) {
     return (
-      <div className="p-4 border-b">
-        <div className="flex items-center space-x-4">
-          {!collapsed && <Skeleton className="h-4 w-4" />}
-          <div className={cn(
-            "flex items-center space-x-4 min-w-0",
-            collapsed ? "justify-center" : "flex-1"
-          )}>
-            <Skeleton className="h-10 w-10 rounded-full" />
-            {!collapsed && (
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
+      <div className="flex items-center space-x-3 px-3 py-2.5">
+        {!collapsed && <Skeleton className="h-4 w-4 rounded-sm" />}
+        <div className={cn(
+          "flex items-center space-x-3 min-w-0",
+          collapsed ? "justify-center" : "flex-1"
+        )}>
+          <Skeleton className="h-8 w-8 rounded-full" />
+          {!collapsed && (
+            <div className="flex-1 space-y-1.5">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-4 w-1/4" />
               </div>
-            )}
-          </div>
+              <Skeleton className="h-3 w-1/3" />
+            </div>
+          )}
         </div>
       </div>
     );
@@ -60,9 +61,9 @@ export function TenantListItem({
   const content = (
     <div
       className={cn(
-        "flex items-center space-x-4 p-4 cursor-pointer transition-colors duration-200",
-        "hover:bg-secondary/50",
-        isSelected && "bg-secondary/50"
+        "flex items-center space-x-3 px-3 py-2.5 cursor-pointer transition-colors duration-200",
+        "hover:bg-muted/50",
+        isSelected && "bg-muted"
       )}
       onClick={handleClick}
     >
@@ -71,31 +72,30 @@ export function TenantListItem({
           checked={checked}
           onCheckedChange={onSelect}
           onClick={(e) => e.stopPropagation()}
-          className="translate-y-[1px]"
         />
       )}
       <div className={cn(
-        "flex items-center space-x-4 min-w-0",
+        "flex items-center space-x-3 min-w-0",
         collapsed ? "justify-center" : "flex-1"
       )}>
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 flex-shrink-0">
-          <Users className="h-5 w-5 text-primary" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 flex-shrink-0">
+          <Users className="h-4 w-4 text-primary" />
         </div>
         {!collapsed && (
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="font-medium leading-none truncate">
-                {tenant.firstName} {tenant.lastName}
+            <div className="flex items-center justify-between">
+              <p className="font-medium leading-none truncate pr-2">
+                {tenant.company}
               </p>
-              <Badge 
+              <Badge
                 variant={tenant.status === "ACTIVE" ? "default" : "secondary"}
-                className="flex-shrink-0"
+                className="capitalize text-xs"
               >
-                {tenant.status.toUpperCase()}
+                {tenant.status.toLowerCase()}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground truncate">
-              {tenant.bpCode} • {tenant.company}
+            <p className="text-sm text-muted-foreground truncate pt-1">
+              {tenant.bpCode}
             </p>
           </div>
         )}
@@ -111,9 +111,9 @@ export function TenantListItem({
         </TooltipTrigger>
         <TooltipContent side="right" className="max-w-[300px]">
           <div className="space-y-1">
-            <p className="font-medium">{tenant.firstName} {tenant.lastName}</p>
+            <p className="font-semibold">{tenant.company}</p>
             <p className="text-sm text-muted-foreground">
-              {tenant.bpCode} • {tenant.company}
+              {tenant.bpCode} • <span className="capitalize">{tenant.status.toLowerCase()}</span>
             </p>
           </div>
         </TooltipContent>

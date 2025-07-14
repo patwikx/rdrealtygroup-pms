@@ -1,16 +1,16 @@
-
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { UnitStats } from "./components/units-stats";
 import { UnitsTableSkeleton } from "./components/units-loading";
-import { UnitsDataTable } from "./components/units-table";
-import Link from "next/link";
 
+import { Metadata } from "next";
+import { UnitsTableWrapper } from "./components/units-table-wrapper";
+
+export const metadata: Metadata = {
+  title: "RD Realty Group - Spaces",
+  description: "Manage and monitor all your property spaces in one place",
+};
 
 export default function UnitsPage() {
-
-
   return (
     <div className="h-full flex-1 flex flex-col space-y-8 p-8">
       <div className="flex justify-between items-center">
@@ -22,13 +22,12 @@ export default function UnitsPage() {
         </div>
       </div>
 
-      <Suspense fallback={<div className="space-y-4">Loading statistics...</div>}>
+  
         <UnitStats />
-      </Suspense>
 
-      <Suspense fallback={<UnitsTableSkeleton />}>
-        <UnitsDataTable />
-      </Suspense>
+  
+        <UnitsTableWrapper />
+  
     </div>
   );
 }

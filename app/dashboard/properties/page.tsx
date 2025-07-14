@@ -9,6 +9,12 @@ import { PropertyList } from "./components/property-list";
 import { getUsers } from "@/actions/get-users-property-tax";
 import { PropertyExportDialog } from "./components/property-export-dialog";
 import { PropertyPrintDialog } from "./components/print-properties-dialog";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "RD Realty Group - Properties",
+  description: "Manage properties & monitor property tax records",
+}
 
 export const revalidate = 0;
 

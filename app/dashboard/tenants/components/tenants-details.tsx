@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Edit, Trash, Plus, Download, FileText, Building2, User, Mail, AlertCircle, Calendar, Phone, ExternalLink, Loader2, Eye, Receipt, MapPin } from "lucide-react";
+import { Edit, Trash, Plus, Download, FileText, Building2, User, Mail, AlertCircle, Calendar, Phone, ExternalLink, Loader2, Eye, Receipt, MapPin, Search, Filter, ChevronDown, X } from "lucide-react";
 import { formatDate, formatPhoneNumber, formatCurrency } from "@/lib/utils/format";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -25,10 +25,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MaintenanceStatus, TenantStatus } from "@prisma/client";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MaintenanceStatus, TenantStatus, DocumentType } from "@prisma/client";
+import type { User as PrismaUser } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
-import { useAsync } from "@/hooks/use-async";
-import { deleteTenant, updateTenant } from "@/actions/tenants";
+import { deleteTenant, updateTenant, getTenantById } from "@/actions/tenants";
 import { AddLeaseDialog } from "./add-lease-dialog";
 import { TerminateLeaseDialog } from "./terminate-lease-dialog";
 import { EditLeaseDialog } from "./edit-lease-dialog";
@@ -49,10 +55,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { AddTenantDocumentDialog } from "./tenants-upload-dialog";
 
 export const revalidate = 0;
 
-// Add the form schema
+// Form schema for editing tenant details
 const tenantFormSchema = z.object({
   bpCode: z.string().min(1, "BP code is required"),
   firstName: z.string().min(1, "First name is required"),
@@ -70,167 +77,246 @@ type TenantFormValues = z.infer<typeof tenantFormSchema>;
 
 interface TenantDetailsProps {
   tenant: TenantWithRelations;
+  users?: PrismaUser[];
+  currentUserId?: string;
 }
 
-export function TenantDetails({ tenant: initialTenant }: TenantDetailsProps) {
+// Document Type Filter Component
+const DocumentTypeFilter = ({
+  selectedTypes,
+  onSelectionChange,
+}: {
+  selectedTypes: DocumentType[];
+  onSelectionChange: (types: DocumentType[]) => void;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const allDocumentTypes = Object.values(DocumentType);
+
+  const handleTypeToggle = (type: DocumentType) => {
+    const newSelection = selectedTypes.includes(type)
+      ? selectedTypes.filter((t) => t !== type)
+      : [...selectedTypes, type];
+    onSelectionChange(newSelection);
+  };
+
+  const handleSelectAll = () => onSelectionChange(allDocumentTypes);
+  const handleClearAll = () => onSelectionChange([]);
+
+  const selectedCount = selectedTypes.length;
+  const totalCount = allDocumentTypes.length;
+  
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all duration-200">
+          <Filter className="h-4 w-4 mr-2" />
+          Filter by Type
+          {selectedCount > 0 && selectedCount < totalCount && (
+            <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700 text-xs">
+              {selectedCount}
+            </Badge>
+          )}
+          <ChevronDown className="h-4 w-4 ml-2" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 bg-white border-slate-200 shadow-lg" align="start">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-slate-900">Filter by Type</h4>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSelectAll}
+                disabled={selectedCount === totalCount}
+                className="h-8 text-xs hover:bg-blue-50 hover:text-blue-700"
+              >
+                Select All
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearAll}
+                disabled={selectedCount === 0}
+                className="h-8 text-xs hover:bg-slate-100"
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+          
+          <div className="border-t border-slate-200 pt-3">
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {allDocumentTypes.map((type) => (
+                <div key={type} className="flex items-center space-x-3 p-2 rounded-md hover:bg-slate-50 transition-colors">
+                  <Checkbox
+                    id={`doc-type-${type}`}
+                    checked={selectedTypes.includes(type)}
+                    onCheckedChange={() => handleTypeToggle(type)}
+                    className="border-slate-300"
+                  />
+                  <label
+                    htmlFor={`doc-type-${type}`}
+                    className="flex-1 cursor-pointer text-sm"
+                  >
+                    <div className="font-medium text-slate-900 capitalize">{type.toLowerCase().replace(/_/g, ' ')}</div>
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {selectedCount > 0 && (
+            <div className="border-t border-slate-200 pt-3">
+              <p className="text-xs text-slate-600">
+                {selectedCount} of {totalCount} types selected
+              </p>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+export function TenantDetails({ tenant: initialTenant, users = [], currentUserId }: TenantDetailsProps) {
   const [tenant, setTenant] = useState(initialTenant);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [documentSearchQuery, setDocumentSearchQuery] = useState('');
+  const [selectedDocumentTypes, setSelectedDocumentTypes] = useState<DocumentType[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const form = useForm<TenantFormValues>({
     resolver: zodResolver(tenantFormSchema),
     defaultValues: {
-      bpCode: tenant.bpCode,
-      firstName: tenant.firstName,
-      lastName: tenant.lastName,
-      email: tenant.email,
-      phone: tenant.phone,
-      company: tenant.company,
-      businessName: tenant.businessName || "",
-      status: tenant.status,
-      emergencyContactName: tenant.emergencyContactName || "",
-      emergencyContactPhone: tenant.emergencyContactPhone || "",
+      ...initialTenant,
+      firstName: initialTenant.firstName || "",
+      lastName: initialTenant.lastName || "",
+      emergencyContactName: initialTenant.emergencyContactName || "",
+      emergencyContactPhone: initialTenant.emergencyContactPhone || "",
     },
   });
 
-  useEffect(() => {
+ useEffect(() => {
     const selectedId = searchParams.get('selected');
     if (selectedId && selectedId !== tenant.id) {
-      fetch(`/api/tenants/${selectedId}`)
-        .then(res => res.json())
+      getTenantById(selectedId)
         .then(data => {
-          setTenant(data);
-          form.reset({
-            bpCode: data.bpCode,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            email: data.email,
-            phone: data.phone,
-            company: data.company,
-            businessName: data.businessName || "",
-            status: data.status,
-            emergencyContactName: data.emergencyContactName || "",
-            emergencyContactPhone: data.emergencyContactPhone || "",
-          });
+          if (data) {
+            setTenant(data);
+            // **FIXED**: Coalesce null values to empty strings on form reset
+            form.reset({
+              ...data,
+              firstName: data.firstName ?? "",
+              lastName: data.lastName ?? "",
+              businessName: data.businessName ?? "",
+              emergencyContactName: data.emergencyContactName ?? "",
+              emergencyContactPhone: data.emergencyContactPhone ?? "",
+            });
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching tenant:', error);
         });
     }
   }, [searchParams, form, tenant.id]);
 
   const handleDelete = async () => {
-    try {
-      setIsDeleting(true);
-      await toast.promise(deleteTenant(tenant.id), {
-        loading: 'Deleting tenant...',
-        success: 'Tenant deleted successfully',
-        error: 'Failed to delete tenant'
-      });
-      router.push("/dashboard/tenants");
-    } catch (error) {
-      // Error is handled by toast
-    } finally {
-      setIsDeleting(false);
-    }
+    setIsDeleting(true);
+    await toast.promise(deleteTenant(tenant.id), {
+      loading: 'Deleting tenant...',
+      success: 'Tenant deleted successfully',
+      error: (err) => err.message || 'Failed to delete tenant'
+    });
+    router.push("/dashboard/tenants");
+    setIsDeleting(false);
   };
 
   const handleUpdate = async (values: TenantFormValues) => {
-    try {
-      setIsUpdating(true);
-      const formData = new FormData();
-      
-      Object.entries(values).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          formData.append(key, value.toString());
-        }
-      });
+    setIsUpdating(true);
+    const formData = new FormData();
+    Object.entries(values).forEach(([key, value]) => {
+      if (value != null) formData.append(key, value.toString());
+    });
 
-      await toast.promise(updateTenant(tenant.id, formData), {
-        loading: 'Updating tenant...',
-        success: () => {
-          setTenant(prev => ({
-            ...prev,
-            ...values
-          }));
-          setIsEditing(false);
-          form.reset(values);
-          return 'Tenant updated successfully';
-        },
-        error: 'Failed to update tenant'
-      });
-    } catch (error) {
-      // Error is handled by toast
-    } finally {
-      setIsUpdating(false);
-    }
+    await toast.promise(updateTenant(tenant.id, formData), {
+      loading: 'Updating tenant...',
+      success: (updatedTenant) => {
+        setTenant(prev => ({ ...prev, ...updatedTenant }));
+        setIsEditing(false);
+        form.reset({
+          bpCode: updatedTenant.bpCode,
+          firstName: updatedTenant.firstName || "",
+          lastName: updatedTenant.lastName || "",
+          email: updatedTenant.email,
+          phone: updatedTenant.phone,
+          company: updatedTenant.company,
+          status: updatedTenant.status,
+          businessName: updatedTenant.businessName ?? "",
+          emergencyContactName: updatedTenant.emergencyContactName ?? "",
+          emergencyContactPhone: updatedTenant.emergencyContactPhone ?? "",
+        });
+        return 'Tenant updated successfully';
+      },
+      error: (err) => err.message || 'Failed to update tenant'
+    });
+    setIsUpdating(false);
   };
 
-  const activeLeases = tenant.leases.filter(lease => 
-    lease.status === "ACTIVE" || lease.status === "PENDING"
-  );
+  const activeLeases = tenant.leases.filter(lease => lease.status === "ACTIVE" || lease.status === "PENDING");
+  const openMaintenanceRequests = tenant.maintenanceRequests.filter(request => request.status !== "COMPLETED" && request.status !== "CANCELLED");
+  
+  // Calculate total rent amount from all active leases
+  const totalRentAmount = activeLeases.reduce((sum, lease) => sum + lease.totalRentAmount, 0);
 
-  const openMaintenanceRequests = tenant.maintenanceRequests.filter(request =>
-    request.status !== "COMPLETED" && request.status !== "CANCELLED"
-  );
+  // Filter documents based on search query and document type
+  const filteredDocuments = tenant.documents.filter((doc) => {
+    const matchesSearch = documentSearchQuery === '' || 
+      doc.name.toLowerCase().includes(documentSearchQuery.toLowerCase()) ||
+      (doc.description && doc.description.toLowerCase().includes(documentSearchQuery.toLowerCase()));
+    
+    const matchesType = selectedDocumentTypes.length === 0 || selectedDocumentTypes.includes(doc.documentType);
+    
+    return matchesSearch && matchesType;
+  });
 
-  // Calculate total rent amount from active leases
-  const totalRentAmount = activeLeases.reduce((sum, lease) => sum + lease.rentAmount, 0);
-
-  // Get available units (units that are vacant or reserved)
-  const availableUnits = tenant.leases
-    .filter(lease => lease.unit.status === "VACANT" || lease.unit.status === "RESERVED")
-    .map(lease => ({
-      id: lease.unit.id,
-      unitNumber: lease.unit.unitNumber,
-      property: {
-        id: lease.unit.property.id,
-        propertyName: lease.unit.property.propertyName
-      }
-    }));
-
-  const handleLeaseCreated = (newLease: any) => {
-    setTenant(prev => ({
-      ...prev,
-      leases: [...prev.leases, newLease]
-    }));
-  };
-
-  const handleLeaseTerminated = (leaseId: string) => {
-    setTenant(prev => ({
-      ...prev,
-      leases: prev.leases.map(lease => 
-        lease.id === leaseId 
-          ? { ...lease, status: "TERMINATED" }
-          : lease
-      )
-    }));
-  };
+  const handleLeaseCreated = (newLease: any) => setTenant(prev => ({ ...prev, leases: [...prev.leases, newLease] }));
+  const handleLeaseTerminated = (leaseId: string) => setTenant(prev => ({ ...prev, leases: prev.leases.map(lease => lease.id === leaseId ? { ...lease, status: "TERMINATED" } : lease) }));
 
   const handleExportLeases = () => {
     const headers = [
-      "Property",
-      "Unit",
+      "Lease ID",
+      "Units",
       "Start Date",
       "End Date",
-      "Rent Amount",
+      "Total Rent Amount",
       "Security Deposit",
       "Status",
       "Termination Date",
       "Termination Reason"
     ];
 
-    const csvData = tenant.leases.map(lease => [
-      lease.unit.property.propertyName,
-      lease.unit.unitNumber,
-      formatDate(lease.startDate),
-      formatDate(lease.endDate),
-      lease.rentAmount.toString(),
-      lease.securityDeposit.toString(),
-      lease.status,
-      lease.terminationDate ? formatDate(lease.terminationDate) : '',
-      lease.terminationReason || ''
-    ]);
+    const csvData = tenant.leases.map(lease => {
+      const unitsList = lease.leaseUnits.map(lu => 
+        `${lu.unit.property.propertyName} - ${lu.unit.unitNumber} (₱${lu.rentAmount})`
+      ).join('; ');
+      
+      return [
+        lease.id,
+        unitsList,
+        formatDate(lease.startDate),
+        formatDate(lease.endDate),
+        lease.totalRentAmount.toString(),
+        lease.securityDeposit.toString(),
+        lease.status,
+        lease.terminationDate ? formatDate(lease.terminationDate) : '',
+        lease.terminationReason || ''
+      ];
+    });
 
     const csvContent = [
       headers.join(','),
@@ -251,6 +337,51 @@ export function TenantDetails({ tenant: initialTenant }: TenantDetailsProps) {
     URL.revokeObjectURL(url);
   };
 
+  const getUploaderName = (uploadedById: string) => {
+    if (!users || users.length === 0) {
+      return `User (${uploadedById.slice(-8)})`;
+    }
+    
+    const user = users.find(u => u.id === uploadedById);
+    if (user) {
+      return `${user.firstName} ${user.lastName}`;
+    }
+    
+    // Fallback: show partial ID instead of "Unknown User"
+    return `User (${uploadedById.slice(-8)})`;
+  };
+
+  const handleExportDocumentsCSV = () => {
+    const csvData = filteredDocuments.map(doc => ({
+      'Name': doc.name,
+      'Description': doc.description || '-',
+      'Type': doc.documentType,
+      'Uploaded By': getUploaderName(doc.uploadedById),
+      'Uploaded Date': formatDate(doc.createdAt),
+      'File URL': doc.fileUrl,
+    }));
+
+    const headers = Object.keys(csvData[0]);
+    const csvString = [
+      headers.join(','),
+      ...csvData.map(row => headers.map(header => {
+        const value = row[header as keyof typeof row];
+        return `"${value}"`;
+      }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    const filename = `tenant_${tenant.firstName}_${tenant.lastName}_documents_${new Date().toISOString().split('T')[0]}.csv`;
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-4 p-4 bg-gradient-to-br from-slate-50 via-white to-slate-50 min-h-screen">
       <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200/60">
@@ -259,7 +390,7 @@ export function TenantDetails({ tenant: initialTenant }: TenantDetailsProps) {
             {/* Main tenant info */}
             <div className="space-y-2">
               <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                {tenant.firstName} {tenant.lastName}
+                {tenant.company}
               </h2>
               <div className="flex items-center gap-3">
                 <Badge variant="outline" className="font-mono text-xs bg-slate-50 border-slate-300">
@@ -789,7 +920,6 @@ export function TenantDetails({ tenant: initialTenant }: TenantDetailsProps) {
               </Button>
               <AddLeaseDialog 
                 tenant={tenant}
-                availableUnits={availableUnits}
                 onLeaseCreated={handleLeaseCreated}
               />
             </div>
@@ -800,10 +930,10 @@ export function TenantDetails({ tenant: initialTenant }: TenantDetailsProps) {
               <Table>
                 <TableHeader className="bg-slate-50 border-b border-slate-200">
                   <TableRow>
-                    <TableHead className="font-semibold text-slate-700">Property/Unit</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Units</TableHead>
                     <TableHead className="font-semibold text-slate-700">Start Date</TableHead>
                     <TableHead className="font-semibold text-slate-700">End Date</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Rent Amount</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Total Rent</TableHead>
                     <TableHead className="font-semibold text-slate-700">Status</TableHead>
                     <TableHead className="text-right font-semibold text-slate-700">Actions</TableHead>
                   </TableRow>
@@ -822,14 +952,22 @@ export function TenantDetails({ tenant: initialTenant }: TenantDetailsProps) {
                     tenant.leases.map((lease) => (
                       <TableRow key={lease.id} className="hover:bg-slate-50 transition-colors duration-150">
                         <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium text-slate-900">{lease.unit.property.propertyName}</span>
-                            <span className="text-sm text-slate-600">Unit {lease.unit.unitNumber}</span>
+                          <div className="space-y-1">
+                            {lease.leaseUnits.map((leaseUnit, index) => (
+                              <div key={leaseUnit.id} className="flex flex-col">
+                                <span className="font-medium text-slate-900">
+                                  {leaseUnit.unit.property.propertyName}
+                                </span>
+                                <span className="text-sm text-slate-600">
+                                  Unit {leaseUnit.unit.unitNumber} - {formatCurrency(leaseUnit.rentAmount.toString())}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         </TableCell>
                         <TableCell className="text-slate-900">{formatDate(lease.startDate)}</TableCell>
                         <TableCell className="text-slate-900">{formatDate(lease.endDate)}</TableCell>
-                        <TableCell className="font-semibold text-slate-900">{formatCurrency(lease.rentAmount.toString())}</TableCell>
+                        <TableCell className="font-semibold text-slate-900">{formatCurrency(lease.totalRentAmount.toString())}</TableCell>
                         <TableCell>
                           <Badge 
                             variant={lease.status === "ACTIVE" ? "default" : lease.status === "TERMINATED" ? "secondary" : "default"}
@@ -884,7 +1022,7 @@ export function TenantDetails({ tenant: initialTenant }: TenantDetailsProps) {
               <Table>
                 <TableHeader className="bg-slate-50 border-b border-slate-200">
                   <TableRow>
-                    <TableHead className="font-semibold text-slate-700">Property/Unit</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Property/Space</TableHead>
                     <TableHead className="font-semibold text-slate-700">Category</TableHead>
                     <TableHead className="font-semibold text-slate-700">Priority</TableHead>
                     <TableHead className="font-semibold text-slate-700">Status</TableHead>
@@ -967,47 +1105,150 @@ export function TenantDetails({ tenant: initialTenant }: TenantDetailsProps) {
                 Manage tenant documents and files
               </p>
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-200">
-              <Plus className="h-4 w-4 mr-2" />
-              Upload Document
-            </Button>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={handleExportDocumentsCSV}
+                disabled={!filteredDocuments.length}
+                className="border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all duration-200"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export to CSV
+              </Button>
+           
+                <AddTenantDocumentDialog
+                  tenantId={tenant.id}
+                  
+                />
+             
+            </div>
           </div>
+
+          {/* Search and Filter Controls */}
+          <div className="flex w-full sm:w-auto">
+            <div className="relative mr-2">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search documents by name or description..."
+                value={documentSearchQuery}
+                onChange={(e) => setDocumentSearchQuery(e.target.value)}
+                className="pl-10 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20 w-full sm:w-[400px]"
+              />
+            </div>
+            <div className="w-full sm:w-auto">
+              <DocumentTypeFilter
+                selectedTypes={selectedDocumentTypes}
+                onSelectionChange={setSelectedDocumentTypes}
+              />
+            </div>
+          </div>
+
+          {/* Filter Status Display */}
+          {(documentSearchQuery || selectedDocumentTypes.length > 0) && (
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Search className="h-4 w-4 text-slate-600" />
+                  <div className="text-sm text-slate-600">
+                    Showing {filteredDocuments.length} of {tenant.documents.length} documents
+                    {documentSearchQuery && (
+                      <span className="ml-1">
+                        matching &quot;<span className="font-medium">{documentSearchQuery}</span>&quot;
+                      </span>
+                    )}
+                    {selectedDocumentTypes.length > 0 && (
+                      <span className="ml-1">
+                        {documentSearchQuery ? 'and' : 'with'} {selectedDocumentTypes.length} selected type{selectedDocumentTypes.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {(documentSearchQuery || selectedDocumentTypes.length > 0) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setDocumentSearchQuery('');
+                      setSelectedDocumentTypes([]);
+                    }}
+                    className="text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear filters
+                  </Button>
+                )}
+              </div>
+              {selectedDocumentTypes.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedDocumentTypes.map(type => (
+                    <Badge key={type} variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
+                      {type.toLowerCase().replace(/_/g, ' ')}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           
           <Card className="bg-white border-slate-200 shadow-sm">
             <CardContent className="p-0">
               <Table>
                 <TableHeader className="bg-slate-50 border-b border-slate-200">
                   <TableRow>
-                    <TableHead className="font-semibold text-slate-700">Name</TableHead>
+                    <TableHead className="font-semibold text-slate-700">File Name</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Description</TableHead>
                     <TableHead className="font-semibold text-slate-700">Type</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Uploaded By</TableHead>
                     <TableHead className="font-semibold text-slate-700">Uploaded</TableHead>
                     <TableHead className="text-right font-semibold text-slate-700">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tenant.documents.length === 0 ? (
+                  {filteredDocuments.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="h-32 text-center text-slate-500">
+                      <TableCell colSpan={6} className="h-32 text-center text-slate-500">
                         <div className="flex flex-col items-center gap-2">
                           <FileText className="h-8 w-8 text-slate-300" />
-                          <span>No document records found</span>
+                          {tenant.documents.length === 0 ? (
+                            <span>No documents found</span>
+                          ) : (
+                            <span>No documents match your search criteria</span>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    tenant.documents.map((doc) => (
+                    filteredDocuments.map((doc) => (
                       <TableRow key={doc.id} className="hover:bg-slate-50 transition-colors duration-150">
-                        <TableCell className="font-medium text-slate-900">{doc.name}</TableCell>
+                        <TableCell className="font-semibold text-slate-900">{doc.name}</TableCell>
+                        <TableCell className="text-slate-900">
+                          {doc.description ? (
+                            <span className="capitalize">{doc.description}</span>
+                          ) : (
+                            <span className="text-slate-400 italic">No description</span>
+                          )}
+                        </TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
-                            {doc.documentType.toLowerCase()}
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            {doc.documentType.toLowerCase().replace(/_/g, ' ')}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-slate-900">
+                          {doc.uploadedBy.firstName} {doc.uploadedBy.lastName}
                         </TableCell>
                         <TableCell className="text-slate-600">{formatDate(doc.createdAt)}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" className="hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150">
-                            <Download className="h-4 w-4" />
-                          </Button>
+                          <a
+                            href={doc.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={doc.name}
+                            title={`Download ${doc.name}`}
+                          >
+                            <Button variant="ghost" size="sm" className="hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </a>
                         </TableCell>
                       </TableRow>
                     ))

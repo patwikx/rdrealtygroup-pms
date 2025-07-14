@@ -1,4 +1,11 @@
 import { LoginForm } from "@/components/auth/login-form";
+import { Metadata } from "next";
+
+
+export const metadata: Metadata = {
+  title: "RD Realty Group - Login",
+  description: "Login to your RD Realty Group account to access the property management system.",
+}
 
 
 

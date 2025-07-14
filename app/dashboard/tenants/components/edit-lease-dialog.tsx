@@ -57,7 +57,7 @@ export function EditLeaseDialog({ lease }: EditLeaseDialogProps) {
     defaultValues: {
       startDate: new Date(lease.startDate),
       endDate: new Date(lease.endDate),
-      rentAmount: Number(lease.rentAmount),
+      rentAmount: Number(lease.totalRentAmount),
       securityDeposit: Number(lease.securityDeposit),
       status: lease.status,
     },

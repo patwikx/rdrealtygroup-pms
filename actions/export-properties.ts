@@ -50,8 +50,8 @@ export async function exportPropertyDataEnhanced(property: PropertyWithRelations
 
   // Calculate totals for overview
   const totalLotArea = property.titles?.reduce((sum, title) => sum + Number(title.lotArea), 0) || 0;
-  const totalUnitArea = property.units.reduce((sum, unit) => sum + Number(unit.unitArea), 0);
-  const totalRentAmount = property.units.reduce((sum, unit) => sum + Number(unit.rentAmount), 0);
+  const totalUnitArea = property.units.reduce((sum, unit) => sum + Number(unit.totalArea), 0);
+  const totalRentAmount = property.units.reduce((sum, unit) => sum + Number(unit.totalRent), 0);
   const allPropertyTaxes = property.titles?.flatMap(title => title.propertyTaxes || []) || [];
   const totalTaxAmount = allPropertyTaxes.reduce((sum, tax) => sum + Number(tax.taxAmount), 0);
   const paidTaxAmount = allPropertyTaxes.filter(tax => tax.isPaid).reduce((sum, tax) => sum + Number(tax.taxAmount), 0);
@@ -193,10 +193,10 @@ export async function exportPropertyDataEnhanced(property: PropertyWithRelations
     // Add headers for units
     waterfallData.push({
       'A': 'Unit Number',
-      'B': 'Area (sqm)',
-      'C': 'Rate (PHP)',
-      'D': 'Rent Amount (PHP)',
-      'E': 'Status'
+      'B': 'Total Area (sqm)',
+      'C': 'Total Rent (PHP)',
+      'D': 'Status',
+      'E': 'Property Title'
     });
     
     ['A', 'B', 'C', 'D', 'E'].forEach(col => {
@@ -206,33 +206,32 @@ export async function exportPropertyDataEnhanced(property: PropertyWithRelations
 
     property.units.forEach((unit, index) => {
       const isEven = index % 2 === 1;
+      const propertyTitle = unit.propertyTitle ? unit.propertyTitle.titleNo : 'Not assigned';
+      
       waterfallData.push({
         'A': unit.unitNumber,
-        'B': Number(unit.unitArea),
-        'C': Number(unit.unitRate),
-        'D': Number(unit.rentAmount),
-        'E': unit.status
+        'B': Number(unit.totalArea),
+        'C': Number(unit.totalRent),
+        'D': unit.status,
+        'E': propertyTitle
       });
 
       waterfallStyles[`A${currentRow}`] = createDataCellStyle(isEven);
       waterfallStyles[`B${currentRow}`] = createNumberCellStyle(isEven);
       waterfallStyles[`C${currentRow}`] = createCurrencyCellStyle(isEven);
-      waterfallStyles[`D${currentRow}`] = createCurrencyCellStyle(isEven);
-      waterfallStyles[`E${currentRow}`] = createStatusCellStyle(unit.status, isEven);
+      waterfallStyles[`D${currentRow}`] = createStatusCellStyle(unit.status, isEven);
+      waterfallStyles[`E${currentRow}`] = createDataCellStyle(isEven);
       currentRow++;
 
-      // Add floor details
-      const floors = [];
-      if (unit.isFirstFloor) floors.push('Ground Floor');
-      if (unit.isSecondFloor) floors.push('Second Floor');
-      if (unit.isThirdFloor) floors.push('Third Floor');
-      if (unit.isRoofTop) floors.push('Rooftop');
-      if (unit.isMezzanine) floors.push('Mezzanine');
-
-      if (floors.length > 0) {
+      // Add floor details if available
+      if (unit.unitFloors && unit.unitFloors.length > 0) {
+        const floorDetails = unit.unitFloors.map(floor => 
+          `${floor.floorType.replace('_', ' ')}: ${formatNumber(floor.area)} sqm @ ${formatCurrency(floor.rate)}/sqm = ${formatCurrency(floor.rent)}`
+        ).join(', ');
+        
         waterfallData.push({
-          'A': '  Floor Location',
-          'B': floors.join(', '),
+          'A': '  Floor Details',
+          'B': floorDetails,
           'C': '',
           'D': '',
           'E': ''
@@ -247,21 +246,21 @@ export async function exportPropertyDataEnhanced(property: PropertyWithRelations
     });
 
     // Add totals
-    const totalUnitAreaSum = property.units.reduce((sum, unit) => sum + Number(unit.unitArea), 0);
-    const totalRentAmountSum = property.units.reduce((sum, unit) => sum + Number(unit.rentAmount), 0);
+    const totalUnitAreaSum = property.units.reduce((sum, unit) => sum + Number(unit.totalArea), 0);
+    const totalRentAmountSum = property.units.reduce((sum, unit) => sum + Number(unit.totalRent), 0);
     
     waterfallData.push({
       'A': 'TOTALS',
       'B': totalUnitAreaSum,
-      'C': '',
-      'D': totalRentAmountSum,
+      'C': totalRentAmountSum,
+      'D': '',
       'E': ''
     });
 
     waterfallStyles[`A${currentRow}`] = createTotalRowStyle();
     waterfallStyles[`B${currentRow}`] = { ...createTotalRowStyle(), numFmt: '#,##0' };
-    waterfallStyles[`C${currentRow}`] = createTotalRowStyle();
-    waterfallStyles[`D${currentRow}`] = { ...createTotalRowStyle(), numFmt: '₱#,##0.00' };
+    waterfallStyles[`C${currentRow}`] = { ...createTotalRowStyle(), numFmt: '₱#,##0.00' };
+    waterfallStyles[`D${currentRow}`] = createTotalRowStyle();
     waterfallStyles[`E${currentRow}`] = createTotalRowStyle();
     currentRow++;
 
@@ -540,8 +539,8 @@ export async function exportAllPropertiesDataEnhanced(properties: PropertyWithRe
   // Data rows for summary
   properties.forEach((property, index) => {
     const totalLotArea = property.titles?.reduce((sum, title) => sum + Number(title.lotArea), 0) || 0;
-    const totalUnitArea = property.units.reduce((sum, unit) => sum + Number(unit.unitArea), 0);
-    const totalRentAmount = property.units.reduce((sum, unit) => sum + Number(unit.rentAmount), 0);
+    const totalUnitArea = property.units.reduce((sum, unit) => sum + Number(unit.totalArea), 0);
+    const totalRentAmount = property.units.reduce((sum, unit) => sum + Number(unit.totalRent), 0);
     const allPropertyTaxes = property.titles?.flatMap(title => title.propertyTaxes || []) || [];
     const totalTaxAmount = allPropertyTaxes.reduce((sum, tax) => sum + Number(tax.taxAmount), 0);
     const paidTaxAmount = allPropertyTaxes.filter(tax => tax.isPaid).reduce((sum, tax) => sum + Number(tax.taxAmount), 0);
