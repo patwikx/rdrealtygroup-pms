@@ -1149,10 +1149,10 @@ const handleDocumentAdded = (newDocument: any) => {
                 Export to CSV
               </Button>
            
-              <AddTenantDocumentDialog
-  tenantId={tenant.id}
-  onDocumentAdded={handleDocumentAdded} // Pass the handler here
-/>
+                <AddTenantDocumentDialog
+                  tenantId={tenant.id}
+                  
+                />
              
             </div>
           </div>
