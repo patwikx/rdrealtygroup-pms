@@ -307,6 +307,16 @@ const handleFileDownload = async (fileUrl: string, fileName: string) => {
   }
 };
 
+const handleDocumentAdded = (newDocument: any) => {
+  setTenant(prev => ({
+    ...prev,
+    documents: [...prev.documents, newDocument],
+  }));
+  // Optionally reset the filters to ensure the new document is visible
+  setDocumentSearchQuery('');
+  setSelectedDocumentTypes([]);
+};
+
   const handleLeaseCreated = (newLease: any) => setTenant(prev => ({ ...prev, leases: [...prev.leases, newLease] }));
   const handleLeaseTerminated = (leaseId: string) => setTenant(prev => ({ ...prev, leases: prev.leases.map(lease => lease.id === leaseId ? { ...lease, status: "TERMINATED" } : lease) }));
 
@@ -1139,10 +1149,10 @@ const handleFileDownload = async (fileUrl: string, fileName: string) => {
                 Export to CSV
               </Button>
            
-                <AddTenantDocumentDialog
-                  tenantId={tenant.id}
-                  
-                />
+              <AddTenantDocumentDialog
+  tenantId={tenant.id}
+  onDocumentAdded={handleDocumentAdded} // Pass the handler here
+/>
              
             </div>
           </div>
