@@ -3,6 +3,15 @@ import { minioClient, DOCUMENTS_BUCKET, generateFileName, getFileUrl, initialize
 
 export async function POST(request: NextRequest) {
   try {
+    // Debug logging
+    console.log('MinIO Config:', {
+      endpoint: process.env.MINIO_ENDPOINT,
+      port: process.env.MINIO_PORT,
+      useSSL: process.env.MINIO_USE_SSL,
+      accessKey: process.env.MINIO_ACCESS_KEY,
+      bucket: process.env.MINIO_DOCUMENTS_BUCKET,
+    });
+
     // Initialize bucket if needed
     await initializeBucket();
     
