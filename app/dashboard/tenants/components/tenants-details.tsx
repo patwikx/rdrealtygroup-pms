@@ -284,6 +284,29 @@ export function TenantDetails({ tenant: initialTenant, users = [], currentUserId
     return matchesSearch && matchesType;
   });
 
+  // Helper function to handle secure file downloads
+const handleFileDownload = async (fileUrl: string, fileName: string) => {
+  try {
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error('Failed to download file');
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Download error:', error);
+    toast.error('Failed to download file');
+  }
+};
+
   const handleLeaseCreated = (newLease: any) => setTenant(prev => ({ ...prev, leases: [...prev.leases, newLease] }));
   const handleLeaseTerminated = (leaseId: string) => setTenant(prev => ({ ...prev, leases: prev.leases.map(lease => lease.id === leaseId ? { ...lease, status: "TERMINATED" } : lease) }));
 
@@ -1237,19 +1260,17 @@ export function TenantDetails({ tenant: initialTenant, users = [], currentUserId
                           {doc.uploadedBy.firstName} {doc.uploadedBy.lastName}
                         </TableCell>
                         <TableCell className="text-slate-600">{formatDate(doc.createdAt)}</TableCell>
-                        <TableCell className="text-right">
-                          <a
-                            href={doc.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download={doc.name}
-                            title={`Download ${doc.name}`}
-                          >
-                            <Button variant="ghost" size="sm" className="hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150">
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </a>
-                        </TableCell>
+<TableCell className="text-right">
+  <Button 
+    variant="ghost" 
+    size="sm" 
+    className="hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150"
+    onClick={() => handleFileDownload(doc.fileUrl, doc.name)}
+    title={`Download ${doc.name}`}
+  >
+    <Download className="h-4 w-4" />
+  </Button>
+</TableCell>
                       </TableRow>
                     ))
                   )}
