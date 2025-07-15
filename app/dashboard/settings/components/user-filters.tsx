@@ -59,52 +59,52 @@ export function UserFilters({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4">
-        <form onSubmit={handleSearchSubmit} className="flex-1">
+      {/* CHANGE 1: Main container for controls updated to a single flex row. */}
+      <div className="flex flex-wrap items-center gap-4">
+        <form onSubmit={handleSearchSubmit}>
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search users by name or email..."
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
-              className="pl-10"
+              // CHANGE 2: Added a fixed width and kept the left padding.
+              className="pl-10 w-[350px]"
             />
           </div>
         </form>
 
-        <div className="flex gap-2">
-          <Select
-            value={role || ""}
-            // FIX 2: Update the handler to check for the new "all" value.
-            onValueChange={(value) => onRoleChange(value === "all" ? undefined : (value as UserRole))}
-          >
-            <SelectTrigger className="w-[180px]">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                <SelectValue placeholder="Filter by role" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {/* FIX 1: Use a non-empty value for the "All Roles" option. */}
-              <SelectItem value="all">All Roles</SelectItem>
-              {roleOptions.map((roleOption) => (
-                <SelectItem key={roleOption.value} value={roleOption.value}>
-                  {roleOption.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Select
+          value={role || ""}
+          onValueChange={(value) =>
+            onRoleChange(value === "all" ? undefined : (value as UserRole))
+          }
+        >
+          <SelectTrigger className="w-[180px]">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              <SelectValue placeholder="Filter by role" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            {roleOptions.map((roleOption) => (
+              <SelectItem key={roleOption.value} value={roleOption.value}>
+                {roleOption.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-          {hasActiveFilters && (
-            <Button
-              variant="outline"
-              onClick={handleClearFilters}
-              className="px-3"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        {hasActiveFilters && (
+          <Button
+            variant="outline"
+            onClick={handleClearFilters}
+            className="px-3"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {hasActiveFilters && (
