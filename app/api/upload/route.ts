@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { minioClient, DOCUMENTS_BUCKET, generateFileName, getFileUrl, initializeBucket } from '@/lib/minio';
+import { minioClient, DOCUMENTS_BUCKET, generateFileName, initializeBucket } from '@/lib/minio';
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     const buffer = await file.arrayBuffer();
     const fileBuffer = Buffer.from(buffer);
 
-    // Upload to MinIO
+    // Upload to MinIO with enhanced metadata
     await minioClient.putObject(
       DOCUMENTS_BUCKET,
       fileName,
@@ -60,12 +60,13 @@ export async function POST(request: NextRequest) {
       file.size,
       {
         'Content-Type': file.type,
-        'Content-Disposition': `inline; filename="${file.name}"`,
+        'Content-Disposition': `attachment; filename="${file.name}"`,
+        'original-filename': file.name,
       }
     );
 
-    // Get the public URL
-    const fileUrl = getFileUrl(fileName);
+    // Return the API download URL instead of direct MinIO URL
+    const fileUrl = `/api/download/${fileName}`;
 
     return NextResponse.json({
       success: true,
