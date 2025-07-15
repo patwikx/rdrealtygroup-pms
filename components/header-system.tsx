@@ -21,6 +21,8 @@ import { logoutWithAudit } from "@/actions/logout"
 import TeamSwitcher from "./team-switcher"
 import { DashboardIcon } from "@radix-ui/react-icons"
 import { GlobalSearch } from "./global-search"
+import { ChangePasswordDialog } from "@/app/auth/login/components/change-password-dialog"
+
 
 const navigation = [
   {
@@ -144,40 +146,45 @@ export function Header({ user }: HeaderProps) {
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-<DropdownMenuContent align="end" className="w-56">
-  <DropdownMenuLabel className="font-normal">
-    {/* This is the new container for text and the avatar */}
-    <div className="flex items-center justify-between space-x-2">
-      <div className="flex flex-col space-y-1">
-        <p className="text-sm font-medium leading-none">{user?.name}</p>
-        <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-      </div>
-      {/* The Avatar component for the profile picture */}
-      <Avatar className="h-10 w-10">
-        <AvatarImage src={user?.image} alt="User profile picture" />
-        <AvatarFallback>{user?.name?.charAt(0).toUpperCase()}</AvatarFallback>
-      </Avatar>
-    </div>
-  </DropdownMenuLabel>
-  <DropdownMenuSeparator />
-  <DropdownMenuItem className="flex justify-between items-center">
-    <span>Profile</span>
-    <Users className="h-4 w-4 ml-2" />
-  </DropdownMenuItem>
-  <DropdownMenuItem className="flex justify-between items-center">
-    <span>Settings</span>
-    <Settings className="h-4 w-4 ml-2" />
-  </DropdownMenuItem>
-  <DropdownMenuItem className="flex justify-between items-center">
-    <span>Change Password</span>
-    <LockKeyholeOpen className="h-4 w-4 ml-2" />
-  </DropdownMenuItem>
-  <DropdownMenuSeparator />
-  <DropdownMenuItem className="text-red-600 flex justify-between items-center" onClick={handleLogout}>
-    <span>Log out</span>
-    <LogOut className="h-4 w-4 ml-2" />
-  </DropdownMenuItem>
-</DropdownMenuContent>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                {/* This is the new container for text and the avatar */}
+                <div className="flex items-center justify-between space-x-2">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user?.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  </div>
+                  {/* The Avatar component for the profile picture */}
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={user?.image} alt="User profile picture" />
+                    <AvatarFallback>{user?.name?.charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="flex justify-between items-center">
+                <span>Profile</span>
+                <Users className="h-4 w-4 ml-2" />
+              </DropdownMenuItem>
+              <DropdownMenuItem className="flex justify-between items-center">
+                <span>Settings</span>
+                <Settings className="h-4 w-4 ml-2" />
+              </DropdownMenuItem>
+              <ChangePasswordDialog>
+                <DropdownMenuItem 
+                  className="flex justify-between items-center"
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  <span>Change Password</span>
+                  <LockKeyholeOpen className="h-4 w-4 ml-2" />
+                </DropdownMenuItem>
+              </ChangePasswordDialog>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-red-600 flex justify-between items-center" onClick={handleLogout}>
+                <span>Log out</span>
+                <LogOut className="h-4 w-4 ml-2" />
+              </DropdownMenuItem>
+            </DropdownMenuContent>
           </DropdownMenu>
 
           {/* Mobile menu */}
