@@ -21,7 +21,8 @@ export default async function DashboardLayout({ children }: RootLayoutProps) {
   const session = await auth();
 
   const user = session?.user ? {
-    name: `${session.user.firstName} ${session.user.lastName}`,
+    firstName: session.user.firstName,
+    lastName: session.user.lastName,
     email: session.user.email as string,
     image: session.user.image as string,
   } : undefined;

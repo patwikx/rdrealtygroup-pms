@@ -54,14 +54,8 @@ const roleOptions = [
   { value: UserRole.ADMIN, label: "Admin" },
   { value: UserRole.MANAGER, label: "Manager" },
   { value: UserRole.STAFF, label: "Staff" },
-  { value: UserRole.TENANT, label: "Tenant" },
-  { value: UserRole.TREASURY, label: "Treasury" },
-  { value: UserRole.PURCHASER, label: "Purchaser" },
   { value: UserRole.ACCTG, label: "Accounting" },
   { value: UserRole.VIEWER, label: "Viewer" },
-  { value: UserRole.OWNER, label: "Owner" },
-  { value: UserRole.STOCKROOM, label: "Stockroom" },
-  { value: UserRole.MAINTENANCE, label: "Maintenance" },
 ]
 
 export function CreateUserDialog({ onSuccess }: CreateUserDialogProps) {
