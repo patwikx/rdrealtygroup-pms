@@ -2,7 +2,7 @@ import { Client } from 'minio';
 
 // MinIO client configuration
 export const minioClient = new Client({
-  endPoint: process.env.MINIO_ENDPOINT || 'localhost',
+  endPoint: process.env.MINIO_ENDPOINT || 'http://console-uc0o800gog8cogcgos00wwok.192.168.25.250.sslip.io/',
   port: parseInt(process.env.MINIO_PORT || '9000'),
   useSSL: process.env.MINIO_USE_SSL === 'true',
   accessKey: process.env.MINIO_ACCESS_KEY || '',
@@ -10,7 +10,7 @@ export const minioClient = new Client({
 });
 
 // Bucket name for documents
-export const DOCUMENTS_BUCKET = process.env.MINIO_DOCUMENTS_BUCKET || 'documents';
+export const DOCUMENTS_BUCKET = process.env.MINIO_DOCUMENTS_BUCKET || 'pms-bucket';
 
 // Initialize bucket if it doesn't exist
 export async function initializeBucket() {
