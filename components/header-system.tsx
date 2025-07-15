@@ -55,8 +55,8 @@ interface NavItem {
 
 const allNavigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: DashboardIcon, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF, UserRole.ACCTG] },
-  { name: "Properties", href: "/dashboard/properties", icon: Building2, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF, UserRole.ACCTG] },
-  { name: "Space", href: "/dashboard/spaces", icon: LucideLandmark, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF, UserRole.ACCTG] },
+  { name: "Properties", href: "/dashboard/properties", icon: Building2, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF] },
+  { name: "Space", href: "/dashboard/spaces", icon: LucideLandmark, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF] },
   { name: "Tenants", href: "/dashboard/tenants", icon: Users, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF, UserRole.ACCTG] },
   { name: "Projects", href: "/dashboard/projects", icon: FileText, roles: [UserRole.ADMIN] },
   { name: "Credit & Collection", href: "/dashboard/pdc-monitoring", icon: CreditCardIcon, roles: [UserRole.ADMIN, UserRole.ACCTG] },
