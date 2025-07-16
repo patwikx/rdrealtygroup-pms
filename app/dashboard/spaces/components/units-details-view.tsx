@@ -20,7 +20,6 @@ interface UnitWithRelations extends Unit {
   })[];
   unitTaxes: UnitTax[];
   utilityAccounts: UnitUtilityAccount[];
-  documents: Document[]; // Assuming documents are also part of the unit details
 }
 
 // The props for this component now use the corrected, more specific type.
