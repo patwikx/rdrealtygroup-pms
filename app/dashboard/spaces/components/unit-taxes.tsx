@@ -63,12 +63,6 @@ export function UnitTaxes({ taxes = [], unitId, unitNumber }: UnitTaxesProps) {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="flex justify-between items-center">
-
-          <div className="flex gap-2">
-
-          </div>
-        </div>
         <div className="rounded-md border">
           <Table>
             <TableHeader>
