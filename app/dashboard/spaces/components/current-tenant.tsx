@@ -134,7 +134,7 @@ export function CurrentTenant({ tenant, lease }: CurrentTenantProps) {
                   <CreditCard className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Security Deposit</p>
-                    <p className="text-xs text-muted-foreground">Held in escrow</p>
+                    <p className="text-xs text-muted-foreground">Amount held for lease security</p>
                   </div>
                 </div>
                 <span className="text-lg font-semibold">
