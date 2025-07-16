@@ -1,6 +1,7 @@
 'use client'
 
-import { Unit, Property, MaintenanceRequest, Lease, Tenant, UnitTax, UnitUtilityAccount, User, UnitFloor, LeaseUnit } from "@prisma/client";
+// **FIXED**: Added 'Document' to Prisma imports for type consistency.
+import { Unit, Property, MaintenanceRequest, Lease, Tenant, UnitTax, UnitUtilityAccount, User, UnitFloor, LeaseUnit, Document } from "@prisma/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +17,6 @@ import { UnitTaxes } from "./unit-taxes";
 import { UnitUtilities } from "./unit-utilities";
 import { EditUnitDialog } from "./edit-unit-dialog";
 
-// **FIXED**: Updated interface to reflect the new many-to-many relationship via LeaseUnit
-// and to include the required `unitFloors` property.
 interface UnitWithRelations extends Unit {
   property: Property;
   unitFloors: UnitFloor[];
@@ -29,6 +28,7 @@ interface UnitWithRelations extends Unit {
   })[];
   unitTaxes: UnitTax[];
   utilityAccounts: UnitUtilityAccount[];
+  documents: Document[];
 }
 
 interface UnitDetailsClientViewProps {
@@ -45,12 +45,9 @@ const statusColorMap: { [key in Unit['status']]: string } = {
 };
 
 export function UnitDetailsClientView({ unit, users, currentUserId }: UnitDetailsClientViewProps) {
-  // **FIXED**: Logic to find the active lease through the `leaseUnits` junction table.
   const activeLeaseUnit = unit.leaseUnits.find(lu => lu.lease.status === "ACTIVE");
   const activeLease = activeLeaseUnit?.lease;
   const currentTenant = activeLease?.tenant;
-
-  // Extract the list of leases from the leaseUnits junction records.
   const allLeases = unit.leaseUnits.map(lu => lu.lease);
 
   return (
@@ -136,13 +133,16 @@ export function UnitDetailsClientView({ unit, users, currentUserId }: UnitDetail
           </TabsTrigger>
           <TabsTrigger value="utilities" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200">
             Utilities
+            {/* **FIXED**: Correctly shows the count of utility accounts */}
             <Badge variant="secondary" className="ml-2 bg-slate-100 text-slate-600 text-xs">
               {unit.utilityAccounts.length}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="documents" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200">
-            Documents  <Badge variant="secondary" className="ml-2 bg-slate-100 text-slate-600 text-xs">
-              {unit.utilityAccounts.length}
+            Documents
+            {/* **FIXED**: Correctly shows the count of documents */}
+            <Badge variant="secondary" className="ml-2 bg-slate-100 text-slate-600 text-xs">
+              {unit.documents.length}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="maintenance" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200">

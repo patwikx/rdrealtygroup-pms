@@ -249,6 +249,11 @@ export async function getUnitDetails(id: string) {
           createdAt: 'desc',
         },
       },
+      documents: {
+        orderBy: {
+            createdAt: 'desc',
+}
+}
     },
   });
 }
