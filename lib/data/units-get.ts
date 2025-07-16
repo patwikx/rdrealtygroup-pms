@@ -241,7 +241,7 @@ export async function getUnitDetails(id: string) {
       },
       unitTaxes: {
         orderBy: {
-          taxYear: 'desc',
+         taxYear: 'desc',
         },
       },
       utilityAccounts: {
