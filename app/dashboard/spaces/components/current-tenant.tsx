@@ -56,7 +56,7 @@ export function CurrentTenant({ tenant, lease }: CurrentTenantProps) {
               </div>
               <div>
                 <h3 className="text-xl font-semibold">
-                  {tenant.firstName} {tenant.lastName}
+                  {tenant.businessName}
                 </h3>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="secondary" className="font-mono">
