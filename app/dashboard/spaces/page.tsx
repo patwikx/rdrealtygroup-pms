@@ -1,6 +1,6 @@
-import { Suspense } from "react";
+
 import { UnitStats } from "./components/units-stats";
-import { UnitsTableSkeleton } from "./components/units-loading";
+
 
 import { Metadata } from "next";
 import { UnitsTableWrapper } from "./components/units-table-wrapper";
