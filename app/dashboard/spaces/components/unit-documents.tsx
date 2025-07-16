@@ -19,6 +19,7 @@ import { AddUnitDocumentDialog } from "./spaces-upload-document-dialog";
 interface Document {
   id: string;
   name: string;
+  description?: string | null; // Optional or nullable
   fileUrl: string;
   documentType: string;
   createdAt: Date | string;
@@ -56,17 +57,38 @@ export function UnitDocuments({ unitId, propertyId }: UnitDocumentsProps) {
     fetchDocuments();
   }, [unitId]); // Re-run the effect if unitId changes
 
+  // 3. Function to handle successful document upload
+  const handleDocumentUploaded = (newDocument: Document) => {
+    setDocuments(prevDocuments => [newDocument, ...prevDocuments]);
+  };
+
+  // 4. Function to refresh documents list (optional, for cases where you want to re-fetch)
+  const refreshDocuments = async () => {
+    try {
+      const data = await getUnitDocuments(unitId);
+      setDocuments(data);
+    } catch (error) {
+      console.error("Failed to refresh documents:", error);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        {/* Note: If this dialog triggers a re-fetch, you may need to pass down a function to update the list */}
-        <AddUnitDocumentDialog unitId={unitId} propertyId={propertyId} />
+        {/* Pass the callback function to the dialog */}
+        <AddUnitDocumentDialog 
+          unitId={unitId} 
+          propertyId={propertyId}
+          onDocumentUploaded={handleDocumentUploaded}
+          onRefresh={refreshDocuments}
+        />
       </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead className="w-1/4">Description</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Uploaded By</TableHead>
               <TableHead>Upload Date</TableHead>
@@ -78,7 +100,7 @@ export function UnitDocuments({ unitId, propertyId }: UnitDocumentsProps) {
             {isLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Loading documents...
@@ -88,6 +110,9 @@ export function UnitDocuments({ unitId, propertyId }: UnitDocumentsProps) {
               documents.map((doc) => (
                 <TableRow key={doc.id}>
                   <TableCell>{doc.name}</TableCell>
+                  <TableCell className="max-w-xs truncate">
+                    {doc.description || "No description provided"}
+                  </TableCell>
                   <TableCell className="capitalize">
                     {doc.documentType.toLowerCase().replace(/_/g, ' ')}
                   </TableCell>
@@ -112,7 +137,7 @@ export function UnitDocuments({ unitId, propertyId }: UnitDocumentsProps) {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="text-center text-muted-foreground"
                 >
                   No documents found

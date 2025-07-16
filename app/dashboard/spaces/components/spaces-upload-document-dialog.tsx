@@ -32,14 +32,32 @@ type UploadedFile = {
   name: string;
 };
 
+// Define the document type to match the parent component
+interface Document {
+  id: string;
+  name: string;
+  description?: string | null;
+  fileUrl: string;
+  documentType: string;
+  createdAt: Date | string;
+  uploadedBy: {
+    firstName: string;
+    lastName: string;
+  };
+}
+
 interface AddUnitDocumentDialogProps {
   unitId: string;
   propertyId?: string;
+  onDocumentUploaded?: (document: Document) => void;
+  onRefresh?: () => void;
 }
 
 export function AddUnitDocumentDialog({
   unitId,
   propertyId,
+  onDocumentUploaded,
+  onRefresh,
 }: AddUnitDocumentDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -72,32 +90,53 @@ export function AddUnitDocumentDialog({
     setIsSaving(true);
 
     try {
-      await toast.promise(
-        createDocument({
-          name: uploadedFile.name,
-          fileUrl: uploadedFile.url,
-          documentType,
-          tenantId: '', // Pass empty for unit documents
-          propertyId: propertyId || '', // Pass propertyId if available
-          unitId, // Pass unitId for unit documents
-          uploadedById: currentUserId?.id || '', // Ensure currentUserId is defined
-          description,
-        }),
-        {
-          loading: "Saving document...",
-          success: () => {
-            router.refresh();
-            setIsOpen(false);
-            setUploadedFile(null);
-            setDescription("");
-            setDocumentType(DocumentType.OTHER);
-            return "Document saved successfully!";
-          },
-          error: (err) => `Failed to save: ${err.message}`,
-        }
-      );
+      const result = await createDocument({
+        name: uploadedFile.name,
+        fileUrl: uploadedFile.url,
+        documentType,
+        tenantId: '', // Pass empty for unit documents
+        propertyId: propertyId || '', // Pass propertyId if available
+        unitId, // Pass unitId for unit documents
+        uploadedById: currentUserId?.id || '', // Ensure currentUserId is defined
+        description,
+      });
+
+      // If the createDocument action returns the created document, use it
+      // Otherwise, create a document object with the data we have
+      const newDocument: Document = result || {
+        id: Date.now().toString(), // Temporary ID if not returned
+        name: uploadedFile.name,
+        description,
+        fileUrl: uploadedFile.url,
+        documentType,
+        createdAt: new Date().toISOString(),
+        uploadedBy: {
+          firstName: currentUserId?.firstName || 'Unknown',
+          lastName: currentUserId?.lastName || 'User',
+        },
+      };
+
+      // Call the callback to update the parent component's state
+      if (onDocumentUploaded) {
+        onDocumentUploaded(newDocument);
+      } else if (onRefresh) {
+        // Fallback to refreshing the list
+        onRefresh();
+      }
+
+      // Show success message
+      toast.success("Document saved successfully!");
+      
+      // Close dialog and reset form
+      setIsOpen(false);
+      setUploadedFile(null);
+      setDescription("");
+      setDocumentType(DocumentType.OTHER);
+      
+      // Optional: still refresh the router for other parts of the app
+      router.refresh();
     } catch (error) {
-      // The toast promise handles displaying the error
+      toast.error(`Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }

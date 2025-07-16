@@ -255,17 +255,26 @@ export async function getUnitDetails(id: string) {
 
 export async function getUnitDocuments(unitId: string) {
   return await prisma.document.findMany({
-    where: {
-      unitId,
-    },
-    include: {
+
+    select: {
+      id: true,
+      name: true,
+      description: true, // Ensure description is optional
+      fileUrl: true,
+      documentType: true,
+      createdAt: true,
       uploadedBy: {
         select: {
           firstName: true,
           lastName: true,
         },
       },
+    
     },
+    where: {
+      unitId: unitId,
+    },
+
     orderBy: {
       createdAt: 'desc',
     },
