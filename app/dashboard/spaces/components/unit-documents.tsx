@@ -9,23 +9,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
 import { format } from "date-fns";
 import { getUnitDocuments } from "@/lib/data/units-get";
 import { AddUnitDocumentDialog } from "./spaces-upload-document-dialog";
+import { DownloadDocumentButton } from "@/components/download-file-button";
+// MODIFIED: Import the new download button
 
-// It's good practice to define the shape of your data
+
+// MODIFIED: The Document type now uses fileName
 interface Document {
   id: string;
   name: string;
-  description?: string | null; // Optional or nullable
-  fileUrl: string;
+  description?: string | null;
+  fileUrl: string; // Changed from fileUrl
   documentType: string;
   createdAt: Date | string;
   uploadedBy: {
-    firstName: string;
-    lastName: string;
+    firstName: string | null;
+    lastName: string | null;
   };
 }
 
@@ -35,52 +36,37 @@ interface UnitDocumentsProps {
 }
 
 export function UnitDocuments({ unitId, propertyId }: UnitDocumentsProps) {
-  // 1. State to hold documents and loading status
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 2. Fetch data on the client side when the component mounts or unitId changes
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      setIsLoading(true);
-      try {
-        const data = await getUnitDocuments(unitId);
-        setDocuments(data);
-      } catch (error) {
-        console.error("Failed to fetch documents:", error);
-        // Optionally, set an error state here to show in the UI
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDocuments();
-  }, [unitId]); // Re-run the effect if unitId changes
-
-  // 3. Function to handle successful document upload
-  const handleDocumentUploaded = (newDocument: Document) => {
-    setDocuments(prevDocuments => [newDocument, ...prevDocuments]);
-  };
-
-  // 4. Function to refresh documents list (optional, for cases where you want to re-fetch)
-  const refreshDocuments = async () => {
+  const fetchDocuments = async () => {
+    setIsLoading(true);
     try {
       const data = await getUnitDocuments(unitId);
       setDocuments(data);
     } catch (error) {
-      console.error("Failed to refresh documents:", error);
+      console.error("Failed to fetch documents:", error);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [unitId]);
+
+  // This function optimistically adds the new document to the UI
+  const handleDocumentUploaded = (newDocument: Document) => {
+    setDocuments(prevDocuments => [newDocument, ...prevDocuments]);
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        {/* Pass the callback function to the dialog */}
         <AddUnitDocumentDialog 
           unitId={unitId} 
           propertyId={propertyId}
           onDocumentUploaded={handleDocumentUploaded}
-          onRefresh={refreshDocuments}
         />
       </div>
       <div className="rounded-md border">
@@ -96,13 +82,9 @@ export function UnitDocuments({ unitId, propertyId }: UnitDocumentsProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {/* 3. Conditional rendering for loading state */}
             {isLoading ? (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="h-24 text-center text-muted-foreground"
-                >
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                   Loading documents...
                 </TableCell>
               </TableRow>
@@ -111,7 +93,7 @@ export function UnitDocuments({ unitId, propertyId }: UnitDocumentsProps) {
                 <TableRow key={doc.id}>
                   <TableCell>{doc.name}</TableCell>
                   <TableCell className="max-w-xs truncate">
-                    {doc.description || "No description provided"}
+                    {doc.description || "No description"}
                   </TableCell>
                   <TableCell className="capitalize">
                     {doc.documentType.toLowerCase().replace(/_/g, ' ')}
@@ -121,25 +103,17 @@ export function UnitDocuments({ unitId, propertyId }: UnitDocumentsProps) {
                   </TableCell>
                   <TableCell>{format(new Date(doc.createdAt), "PPP")}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" asChild>
-                      <a
-                        href={doc.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Download ${doc.name}`}
-                      >
-                        <Download className="h-4 w-4" />
-                      </a>
-                    </Button>
+                    {/* MODIFIED: Use the new secure download button */}
+                    <DownloadDocumentButton 
+                      fileName={doc.fileUrl} 
+                      docName={doc.name} 
+                    />
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="text-center text-muted-foreground"
-                >
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   No documents found
                 </TableCell>
               </TableRow>
