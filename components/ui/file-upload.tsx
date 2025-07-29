@@ -7,13 +7,14 @@ import { Upload, X, FileIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from './input';
 
-interface UploadedFile {
-  url: string;
-  name: string;
+// MODIFIED: This is the data that the onUploadComplete callback will provide.
+interface UploadCompleteResult {
+  fileName: string; // The unique key from MinIO
+  name: string;     // The original, user-friendly filename
 }
 
 interface FileUploadProps {
-  onUploadComplete: (file: UploadedFile) => void;
+  onUploadComplete: (result: UploadCompleteResult) => void;
   onUploadError: (error: string) => void;
   disabled?: boolean;
   maxSize?: number; // in MB
@@ -37,7 +38,6 @@ export function FileUpload({
   const handleFileSelect = (file: File) => {
     if (disabled) return;
 
-    // Validate file size
     if (file.size > maxSize * 1024 * 1024) {
       onUploadError(`File size exceeds ${maxSize}MB limit`);
       return;
@@ -67,20 +67,21 @@ export function FileUpload({
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
       const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Upload failed');
+      }
       
-      if (result.success) {
+      // MODIFIED: Handle the new API response shape
+      if (result.success && result.fileName) {
+        // Pass up both the unique fileName from the API and the original name
         onUploadComplete({
-          url: result.fileUrl,
-          name: result.originalName,
+          fileName: result.fileName,
+          name: file.name,
         });
       } else {
-        throw new Error(result.error || 'Upload failed');
+        throw new Error(result.error || 'Upload failed: Invalid server response');
       }
     } catch (error) {
       onUploadError(error instanceof Error ? error.message : 'Upload failed');
@@ -92,9 +93,7 @@ export function FileUpload({
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!disabled) {
-      setIsDragOver(true);
-    }
+    if (!disabled) setIsDragOver(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -105,26 +104,18 @@ export function FileUpload({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    
     if (disabled) return;
-
     const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      handleFileSelect(files[0]);
-    }
+    if (files.length > 0) handleFileSelect(files[0]);
   };
 
   const handleClick = () => {
-    if (!disabled && fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+    if (!disabled && fileInputRef.current) fileInputRef.current.click();
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length > 0) {
-      handleFileSelect(files[0]);
-    }
+    if (files.length > 0) handleFileSelect(files[0]);
   };
 
   return (
@@ -132,9 +123,7 @@ export function FileUpload({
       <div
         className={cn(
           'relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
-          isDragOver && !disabled
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-slate-300 hover:border-slate-400',
+          isDragOver && !disabled ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-slate-400',
           disabled && 'opacity-50 cursor-not-allowed',
           isUploading && 'pointer-events-none'
         )}
@@ -151,7 +140,6 @@ export function FileUpload({
           className="hidden"
           disabled={disabled}
         />
-
         {isUploading ? (
           <div className="space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
@@ -165,12 +153,8 @@ export function FileUpload({
           <div className="space-y-4">
             <Upload className="h-8 w-8 text-slate-400 mx-auto" />
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-700">
-                Drop files here or click to browse
-              </p>
-              <p className="text-xs text-slate-500">
-                Maximum file size: {maxSize}MB
-              </p>
+              <p className="text-sm font-medium text-slate-700">Drop files here or click to browse</p>
+              <p className="text-xs text-slate-500">Maximum file size: {maxSize}MB</p>
             </div>
           </div>
         )}
@@ -179,8 +163,9 @@ export function FileUpload({
   );
 }
 
+// MODIFIED: The display component only needs the file's name.
 interface UploadedFileDisplayProps {
-  file: UploadedFile;
+  file: { name: string };
   onRemove: () => void;
   disabled?: boolean;
 }

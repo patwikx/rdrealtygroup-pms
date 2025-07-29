@@ -26,10 +26,10 @@ import { DocumentType } from "@prisma/client";
 import { FileUpload, UploadedFileDisplay } from "@/components/ui/file-upload";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
-// Define the type for the uploaded file
-type UploadedFile = {
-  url: string;
-  name: string;
+// MODIFIED: Define the type for the upload result
+type UploadedFileResult = {
+  fileName: string; // The unique key from MinIO
+  name: string;     // The original, user-friendly filename
 };
 
 interface AddTenantDocumentDialogProps {
@@ -41,15 +41,15 @@ export function AddTenantDocumentDialog({
 }: AddTenantDocumentDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<UploadedFileResult | null>(null);
   const [documentType, setDocumentType] = useState<DocumentType>(DocumentType.OTHER);
   const [description, setDescription] = useState("");
   const router = useRouter();
 
-  const currentUserId = useCurrentUser();
+  const currentUser = useCurrentUser(); // Changed variable name for clarity
 
-  const handleUploadComplete = (file: UploadedFile) => {
-    setUploadedFile(file);
+  const handleUploadComplete = (result: UploadedFileResult) => {
+    setUploadedFile(result);
   };
 
   const handleUploadError = (error: string) => {
@@ -66,18 +66,22 @@ export function AddTenantDocumentDialog({
       toast.error("Please upload a file first.");
       return;
     }
+    if (!currentUser?.id) {
+      toast.error("You must be logged in to upload a document.");
+      return;
+    }
 
     setIsSaving(true);
 
     try {
+      // MODIFIED: Pass `fileName` to the server action instead of `fileUrl`
       await toast.promise(
         createDocument({
           name: uploadedFile.name,
-          fileUrl: uploadedFile.url,
+          fileUrl: uploadedFile.fileName, // Changed from fileUrl
           documentType,
-          tenantId, // Pass tenantId here
-          propertyId: '', // Pass empty or null if not applicable
-          uploadedById: currentUserId?.id || '', // Ensure currentUserId is defined
+          tenantId,
+          uploadedById: currentUser.id,
           description,
         }),
         {
@@ -133,7 +137,7 @@ export function AddTenantDocumentDialog({
               <Label className="font-medium text-slate-700">Document File</Label>
               {uploadedFile ? (
                 <UploadedFileDisplay
-                  file={uploadedFile}
+                  file={{ name: uploadedFile.name }}
                   onRemove={handleRemoveFile}
                   disabled={isSaving}
                 />

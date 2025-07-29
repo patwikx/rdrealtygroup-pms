@@ -1,9 +1,8 @@
-import { minioClient, DOCUMENTS_BUCKET, generateFileName, getFileUrl, initializeBucket } from '@/lib/minio';
+import { minioClient, DOCUMENTS_BUCKET, generateFileName, initializeBucket } from '@/lib/minio';
 
 export interface UploadResult {
   success: boolean;
-  fileUrl?: string;
-  fileName?: string;
+  fileName?: string; // The function now returns the filename, not a direct URL.
   error?: string;
 }
 
@@ -55,16 +54,16 @@ export async function uploadFileToMinio(formData: FormData): Promise<UploadResul
       file.size,
       {
         'Content-Type': file.type,
-        'Content-Disposition': `inline; filename="${file.name}"`,
+        // Using 'attachment' encourages the browser to download the file directly
+        'Content-Disposition': `attachment; filename="${file.name}"`,
       }
     );
 
-    // Get the public URL
-    const fileUrl = getFileUrl(fileName);
-
+    // The function now returns the permanent filename.
+    // To get a temporary download link, you'll use this filename 
+    // to call `generatePresignedUrl` from your API when a user clicks a download button.
     return {
       success: true,
-      fileUrl,
       fileName,
     };
   } catch (error) {

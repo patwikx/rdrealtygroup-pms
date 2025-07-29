@@ -25,10 +25,10 @@ import { createDocument } from "@/actions/document";
 import { DocumentType } from "@prisma/client";
 import { FileUpload, UploadedFileDisplay } from "@/components/ui/file-upload";
 
-// Define the type for the uploaded file
-type UploadedFile = {
-  url: string;
-  name: string;
+// MODIFIED: Define the type for the uploaded file's result
+type UploadedFileResult = {
+  fileName: string; // The unique name from MinIO
+  name: string;     // The original name of the file
 };
 
 interface AddDocumentDialogProps {
@@ -42,13 +42,13 @@ export function AddDocumentDialog({
 }: AddDocumentDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<UploadedFileResult | null>(null); // Use the new type
   const [documentType, setDocumentType] = useState<DocumentType>(DocumentType.OTHER);
   const [description, setDescription] = useState("");
   const router = useRouter();
 
-  const handleUploadComplete = (file: UploadedFile) => {
-    setUploadedFile(file);
+  const handleUploadComplete = (result: UploadedFileResult) => {
+    setUploadedFile(result);
   };
 
   const handleUploadError = (error: string) => {
@@ -69,10 +69,12 @@ export function AddDocumentDialog({
     setIsSaving(true);
 
     try {
+      // MODIFIED: Pass the `fileName` to your server action, not a `fileUrl`.
+      // Your `createDocument` action should be updated to accept `fileName`.
       await toast.promise(
         createDocument({
           name: uploadedFile.name,
-          fileUrl: uploadedFile.url,
+          fileUrl: uploadedFile.fileName, // Changed from fileUrl
           documentType,
           propertyId,
           uploadedById: currentUserId,
@@ -131,7 +133,10 @@ export function AddDocumentDialog({
               <Label className="font-medium text-slate-700">Document File</Label>
               {uploadedFile ? (
                 <UploadedFileDisplay
-                  file={uploadedFile}
+                  // Note: `UploadedFileDisplay` might need a small update
+                  // to accept `fileName` instead of `url` if it uses the url.
+                  // But it likely just displays the `name`.
+                  file={{ name: uploadedFile.name }}
                   onRemove={handleRemoveFile}
                   disabled={isSaving}
                 />
@@ -161,7 +166,7 @@ export function AddDocumentDialog({
                 <SelectContent className="bg-white border-slate-200">
                   {Object.values(DocumentType).map((type) => (
                     <SelectItem key={type} value={type}>
-                      {type.charAt(0) + type.slice(1).toLowerCase()}
+                      {type.charAt(0) + type.slice(1).toLowerCase().replace(/_/g, ' ')}
                     </SelectItem>
                   ))}
                 </SelectContent>
