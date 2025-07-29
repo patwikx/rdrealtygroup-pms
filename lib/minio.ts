@@ -2,7 +2,7 @@ import { Client } from 'minio';
 
 // MinIO client configuration
 export const minioClient = new Client({
-  endPoint: process.env.MINIO_ENDPOINT || 'http://console-uc0o800gog8cogcgos00wwok.192.168.25.250.sslip.io/',
+  endPoint: process.env.MINIO_ENDPOINT || 'https://s3-api.rdrealty.com.ph',
   port: parseInt(process.env.MINIO_PORT || '9000'),
   useSSL: process.env.MINIO_USE_SSL === 'true',
   accessKey: process.env.MINIO_ACCESS_KEY || '',
