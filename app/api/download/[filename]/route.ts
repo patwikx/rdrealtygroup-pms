@@ -1,56 +1,43 @@
+// app/api/download/[filename]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
-import { minioClient, DOCUMENTS_BUCKET } from '@/lib/minio';
-import { Buffer } from 'buffer'; // Ensure Buffer is explicitly imported
+import { minioClient, DOCUMENTS_BUCKET, generatePresignedUrl } from '@/lib/minio';
+import { auth } from '@/auth'; // Assuming you use auth.js for security
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { filename: string } }
 ) {
   try {
+    // --- SECURITY CHECK ---
+    // Ensure the user is authenticated before allowing a download link to be generated.
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { filename } = params;
     
     if (!filename) {
       return NextResponse.json({ error: 'Filename is required' }, { status: 400 });
     }
 
-    // Get the file from MinIO
-    const fileStream = await minioClient.getObject(DOCUMENTS_BUCKET, filename);
+    // Generate the secure, temporary download link from MinIO
+    const presignedUrl = await generatePresignedUrl(filename);
     
-    // Get file info to determine content type and other metadata
-    const fileInfo = await minioClient.statObject(DOCUMENTS_BUCKET, filename);
-    
-    // --- FIX ---
-    // Declare chunks as an array of Uint8Array to resolve the type conflict.
-    // Node.js Buffers are instances of Uint8Array, so this is type-safe.
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of fileStream) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
+    // Return the URL in a JSON object, as the client expects
+    return NextResponse.json({ url: presignedUrl });
 
-    // Get original filename from metadata or use the stored filename
-    const originalFilename = fileInfo.metaData?.['original-filename'] || filename;
-    
-    // Create response with the file's buffer
-    const response = new NextResponse(buffer);
-    
-    // Set appropriate headers for a file download
-    response.headers.set('Content-Type', fileInfo.metaData?.['content-type'] || 'application/octet-stream');
-    response.headers.set('Content-Disposition', `attachment; filename="${originalFilename}"`);
-    response.headers.set('Content-Length', buffer.length.toString());
-    
-    return response;
   } catch (error) {
-    console.error('Error downloading file:', error);
+    console.error('Error generating pre-signed URL:', error);
     
-    // Check if the error is a MinIO/S3 'Not Found' error
+    // Check for specific MinIO errors if needed
     if (error instanceof Error && (error as any).code === 'NoSuchKey') {
-      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+      return NextResponse.json({ error: 'File not found in storage' }, { status: 404 });
     }
     
-    // Generic error for any other issues
     return NextResponse.json(
-      { error: 'Failed to download file' },
+      { error: 'Failed to generate download link' },
       { status: 500 }
     );
   }
