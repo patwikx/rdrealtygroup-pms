@@ -49,7 +49,7 @@ export function generateFileName(originalName: string): string {
 
 // Get the public URL for a file
 export function getFileUrl(fileName: string): string {
-  const endpoint = process.env.MINIO_ENDPOINT || 'localhost';
+  const endpoint = process.env.MINIO_ENDPOINT || 'https://s3-api.rdrealty.com.ph';
   const port = process.env.MINIO_PORT || '9000';
   const useSSL = process.env.MINIO_USE_SSL === 'true';
   const protocol = useSSL ? 'https' : 'http';
