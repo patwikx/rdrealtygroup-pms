@@ -60,6 +60,7 @@ import { UpdateTitleStatusDialog } from "./update-title-movement-dialog";
 import { deletePropertyTitle } from "@/actions/property-titles";
 import { AddPropertyTitleDialog } from "./add-property-title-dialog";
 import { AddDocumentDialog } from "./upload-document-dialog";
+import { DownloadDocumentButton } from "@/components/download-file-button";
 
 // Reusable Pagination Component
 const ITEMS_PER_PAGE = 10;
@@ -1791,6 +1792,8 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                         </TableCell>
                         <TableCell className="text-slate-600">{formatDate(doc.createdAt)}</TableCell>
                         <TableCell className="text-right">
+
+                          {/** 
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -1800,6 +1803,12 @@ export function PropertyDetails({ property, currentUserId, users }: PropertyDeta
                           >
                             <Download className="h-4 w-4" />
                           </Button>
+                          */}
+                          <DownloadDocumentButton
+                           fileName={doc.fileUrl} 
+                            docName={doc.name} 
+
+                          />
                         </TableCell>
                       </TableRow>
                     ))

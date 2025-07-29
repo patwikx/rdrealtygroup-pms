@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { AddTenantDocumentDialog } from "./tenants-upload-dialog";
+import { DownloadDocumentButton } from "@/components/download-file-button";
 
 export const revalidate = 0;
 
@@ -1271,6 +1272,7 @@ const handleDocumentAdded = (newDocument: any) => {
                         </TableCell>
                         <TableCell className="text-slate-600">{formatDate(doc.createdAt)}</TableCell>
 <TableCell className="text-right">
+  {/*
   <Button 
     variant="ghost" 
     size="sm" 
@@ -1280,6 +1282,13 @@ const handleDocumentAdded = (newDocument: any) => {
   >
     <Download className="h-4 w-4" />
   </Button>
+  */}
+
+                          <DownloadDocumentButton
+                           fileName={doc.fileUrl} 
+                            docName={doc.name} 
+
+                          />
 </TableCell>
                       </TableRow>
                     ))
