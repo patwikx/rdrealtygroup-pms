@@ -2,7 +2,7 @@ import { Client } from 'minio';
 
 // MinIO client configuration
 export const minioClient = new Client({
-  endPoint: process.env.MINIO_ENDPOINT || 'https://s3-api.rdrealty.com.ph',
+  endPoint: process.env.MINIO_ENDPOINT || 's3-api.rdrealty.com.ph',
   port: parseInt(process.env.MINIO_PORT || '9000'),
   useSSL: process.env.MINIO_USE_SSL === 'true',
   accessKey: process.env.MINIO_ACCESS_KEY || '',
@@ -49,7 +49,7 @@ export function generateFileName(originalName: string): string {
 
 // Get the public URL for a file
 export function getFileUrl(fileName: string): string {
-  const endpoint = process.env.MINIO_ENDPOINT || 'https://s3-api.rdrealty.com.ph';
+  const endpoint = process.env.MINIO_ENDPOINT || 's3-api.rdrealty.com.ph';
   const port = process.env.MINIO_PORT || '9000';
   const useSSL = process.env.MINIO_USE_SSL === 'true';
   const protocol = useSSL ? 'https' : 'http';
