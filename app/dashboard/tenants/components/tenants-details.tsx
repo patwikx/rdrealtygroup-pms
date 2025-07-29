@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Edit, Trash, Plus, Download, FileText, Building2, User, Mail, AlertCircle, Calendar, Phone, ExternalLink, Loader2, Eye, Receipt, MapPin, Search, Filter, ChevronDown, X } from "lucide-react";
+import { Edit, Trash, Plus, Download, FileText, Building2, User, Mail, AlertCircle, Calendar, Phone, Loader2, Eye, Receipt, Search, Filter, ChevronDown, X } from "lucide-react";
 import { formatDate, formatPhoneNumber, formatCurrency } from "@/lib/utils/format";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -39,7 +39,7 @@ import { AddLeaseDialog } from "./add-lease-dialog";
 import { TerminateLeaseDialog } from "./terminate-lease-dialog";
 import { EditLeaseDialog } from "./edit-lease-dialog";
 import { Separator } from "@/components/ui/separator";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { z } from 'zod';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";

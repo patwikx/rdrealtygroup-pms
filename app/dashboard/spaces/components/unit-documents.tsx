@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -39,21 +39,21 @@ export function UnitDocuments({ unitId, propertyId }: UnitDocumentsProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchDocuments = async () => {
-    setIsLoading(true);
-    try {
-      const data = await getUnitDocuments(unitId);
-      setDocuments(data);
-    } catch (error) {
-      console.error("Failed to fetch documents:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+const fetchDocuments = useCallback(async () => {
+  setIsLoading(true);
+  try {
+    const data = await getUnitDocuments(unitId);
+    setDocuments(data);
+  } catch (error) {
+    console.error("Failed to fetch documents:", error);
+  } finally {
+    setIsLoading(false);
+  }
+}, [unitId]);
 
-  useEffect(() => {
-    fetchDocuments();
-  }, [unitId]);
+useEffect(() => {
+  fetchDocuments();
+}, [fetchDocuments]); // Now it's safe and stable
 
   // This function optimistically adds the new document to the UI
   const handleDocumentUploaded = (newDocument: Document) => {
