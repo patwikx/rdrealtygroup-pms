@@ -70,7 +70,7 @@ async function PDCContent() {
           </div>
         </CardHeader>
         <CardContent>
-          <PDCTable pdcs={pdcs} />
+          <PDCTable pdcs={pdcs} tenants={tenants} />
         </CardContent>
       </Card>
     </div>

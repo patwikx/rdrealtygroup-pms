@@ -1,40 +1,38 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
-import { CreatePDCInput, createPDCSchema, UpdatePDCStatusInput, updatePDCStatusSchema } from "@/lib/validations/pdc-valitdations"
-
+import {
+  type CreatePDCInput,
+  createPDCSchema,
+  type UpdatePDCStatusInput,
+  updatePDCStatusSchema,
+  type UpdatePDCInput,
+  updatePDCSchema, // You will add this to your validations file
+} from "@/lib/validations/pdc-valitdations"
 
 export async function createPDC(data: CreatePDCInput) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
-      throw new Error("Unauthorized")
+      return { success: false, error: "Unauthorized" }
     }
 
     const validatedData = createPDCSchema.parse(data)
 
-    // Get tenant info for bpName
     const tenant = await prisma.tenant.findUnique({
       where: { bpCode: validatedData.bpCode },
-      select: { company: true, businessName: true }
+      select: { company: true, businessName: true },
     })
 
     if (!tenant) {
-      throw new Error("Tenant not found")
+      return { success: false, error: "Tenant not found" }
     }
 
     const pdc = await prisma.pDC.create({
       data: {
-        refNo: validatedData.refNo,
-        bankName: validatedData.bankName,
-        dueDate: new Date(validatedData.dueDate),
-        checkNo: validatedData.checkNo,
-        amount: validatedData.amount,
-        remarks: validatedData.remarks,
-        bpCode: validatedData.bpCode,
+        ...validatedData,
         bpName: tenant.company || tenant.businessName,
         updatedById: session.user.id,
       },
@@ -44,9 +42,38 @@ export async function createPDC(data: CreatePDCInput) {
     return { success: true, data: pdc }
   } catch (error) {
     console.error("Error creating PDC:", error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Failed to create PDC" 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create PDC",
+    }
+  }
+}
+
+// NEW FUNCTION TO UPDATE A PDC RECORD
+export async function updatePDC(data: UpdatePDCInput) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const { id, ...updateData } = updatePDCSchema.parse(data)
+
+    await prisma.pDC.update({
+      where: { id },
+      data: {
+        ...updateData,
+        updatedById: session.user.id,
+      },
+    })
+
+    revalidatePath("/credit-collection")
+    return { success: true, message: "PDC record updated successfully." }
+  } catch (error) {
+    console.error("Error updating PDC:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update PDC",
     }
   }
 }
@@ -55,7 +82,7 @@ export async function updatePDCStatus(data: UpdatePDCStatusInput) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
-      throw new Error("Unauthorized")
+      return { success: false, error: "Unauthorized" }
     }
 
     const validatedData = updatePDCStatusSchema.parse(data)
@@ -72,9 +99,9 @@ export async function updatePDCStatus(data: UpdatePDCStatusInput) {
     return { success: true, data: pdc }
   } catch (error) {
     console.error("Error updating PDC status:", error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Failed to update PDC status" 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update PDC status",
     }
   }
 }
@@ -88,18 +115,18 @@ export async function getPDCs() {
             company: true,
             businessName: true,
             email: true,
-          }
+          },
         },
         updatedBy: {
           select: {
             firstName: true,
             lastName: true,
-          }
-        }
+          },
+        },
       },
       orderBy: {
-        docDate: "desc"
-      }
+        docDate: "desc",
+      },
     })
 
     return pdcs
@@ -119,8 +146,8 @@ export async function getTenants() {
         email: true,
       },
       orderBy: {
-        company: "asc"
-      }
+        company: "asc",
+      },
     })
 
     return tenants
@@ -134,20 +161,20 @@ export async function deletePDC(id: string) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
-      throw new Error("Unauthorized")
+      return { success: false, error: "Unauthorized" }
     }
 
     await prisma.pDC.delete({
-      where: { id }
+      where: { id },
     })
 
     revalidatePath("/credit-collection")
     return { success: true }
   } catch (error) {
     console.error("Error deleting PDC:", error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Failed to delete PDC" 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete PDC",
     }
   }
 }

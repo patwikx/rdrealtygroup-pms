@@ -2,8 +2,7 @@
 
 import { useState, useTransition, useMemo } from "react"
 import { format } from "date-fns"
-import { MoreHorizontal, Pencil, Trash2, Filter, Printer, Download, CalendarIcon, X } from "lucide-react"
-
+import { MoreHorizontal, Pencil, Trash2, Filter, Printer, Download, CalendarIcon, X, Check } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,14 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,24 +25,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
-import { deletePDC, updatePDCStatus } from "@/actions/pdc-actions"
+import { deletePDC, updatePDCStatus, updatePDC } from "@/actions/pdc-actions"
 
 type PDC = {
   id: string
@@ -76,13 +58,33 @@ type PDC = {
   }
 }
 
+type Tenant = {
+  bpCode: string
+  company: string | null
+  businessName: string
+  email: string
+}
+
 interface PDCTableProps {
   pdcs: PDC[]
+  tenants?: Tenant[]
 }
 
 interface DateRange {
   from: Date | undefined
   to: Date | undefined
+}
+
+interface EditingPDC {
+  id: string
+  docDate: Date
+  refNo: string
+  bankName: string
+  dueDate: Date
+  checkNo: string
+  amount: number
+  remarks: string
+  bpCode: string
 }
 
 const statusColors = {
@@ -101,10 +103,14 @@ const statusOptions = [
   { value: "Cancelled", label: "Cancelled" },
 ]
 
-export function PDCTable({ pdcs }: PDCTableProps) {
+export function PDCTable({ pdcs, tenants = [] }: PDCTableProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  
+
+  // Edit states
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingData, setEditingData] = useState<EditingPDC | null>(null)
+
   // Filter states
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [bpNameFilter, setBpNameFilter] = useState("")
@@ -114,54 +120,56 @@ export function PDCTable({ pdcs }: PDCTableProps) {
 
   // Filter PDCs based on all selected filters
   const filteredPDCs = useMemo(() => {
-    return pdcs.filter(pdc => {
+    return pdcs.filter((pdc) => {
       // Status filter
       if (statusFilters.length > 0 && !statusFilters.includes(pdc.status)) {
         return false
       }
-
       // BP Name filter
       if (bpNameFilter && !pdc.bpName.toLowerCase().includes(bpNameFilter.toLowerCase())) {
         return false
       }
-
       // Bank Name filter
       if (bankNameFilter && !pdc.bankName.toLowerCase().includes(bankNameFilter.toLowerCase())) {
         return false
       }
-
       // Doc Date range filter
       if (docDateRange.from || docDateRange.to) {
         const docDate = new Date(pdc.docDate)
         if (docDateRange.from && docDate < docDateRange.from) return false
         if (docDateRange.to && docDate > docDateRange.to) return false
       }
-
       // Due Date range filter
       if (dueDateRange.from || dueDateRange.to) {
         const dueDate = new Date(pdc.dueDate)
         if (dueDateRange.from && dueDate < dueDateRange.from) return false
         if (dueDateRange.to && dueDate > dueDateRange.to) return false
       }
-
       return true
     })
   }, [pdcs, statusFilters, bpNameFilter, bankNameFilter, docDateRange, dueDateRange])
 
   // Get unique values for filter options
   const uniqueBankNames = useMemo(() => {
-    return Array.from(new Set(pdcs.map(pdc => pdc.bankName))).sort()
+    return Array.from(new Set(pdcs.map((pdc) => pdc.bankName))).sort()
   }, [pdcs])
 
   const uniqueBpNames = useMemo(() => {
-    return Array.from(new Set(pdcs.map(pdc => pdc.bpName))).sort()
+    return Array.from(new Set(pdcs.map((pdc) => pdc.bpName))).sort()
   }, [pdcs])
+
+  // Get tenant name by bpCode
+  const getTenantName = (bpCode: string) => {
+    if (!tenants || tenants.length === 0) return bpCode
+    const tenant = tenants.find((t) => t.bpCode === bpCode)
+    return tenant ? tenant.company || tenant.businessName : bpCode
+  }
 
   const handleStatusFilterChange = (status: string, checked: boolean) => {
     if (checked) {
-      setStatusFilters(prev => [...prev, status])
+      setStatusFilters((prev) => [...prev, status])
     } else {
-      setStatusFilters(prev => prev.filter(s => s !== status))
+      setStatusFilters((prev) => prev.filter((s) => s !== status))
     }
   }
 
@@ -174,13 +182,15 @@ export function PDCTable({ pdcs }: PDCTableProps) {
   }
 
   const hasActiveFilters = () => {
-    return statusFilters.length > 0 || 
-           bpNameFilter !== "" || 
-           bankNameFilter !== "" || 
-           docDateRange.from || 
-           docDateRange.to || 
-           dueDateRange.from || 
-           dueDateRange.to
+    return (
+      statusFilters.length > 0 ||
+      bpNameFilter !== "" ||
+      bankNameFilter !== "" ||
+      docDateRange.from ||
+      docDateRange.to ||
+      dueDateRange.from ||
+      dueDateRange.to
+    )
   }
 
   const getActiveFilterCount = () => {
@@ -196,7 +206,7 @@ export function PDCTable({ pdcs }: PDCTableProps) {
   const handleStatusChange = (id: string, status: PDC["status"]) => {
     startTransition(async () => {
       const result = await updatePDCStatus({ id, status })
-      
+
       if (result.success) {
         toast.success("PDC status updated successfully")
       } else {
@@ -208,7 +218,7 @@ export function PDCTable({ pdcs }: PDCTableProps) {
   const handleDelete = (id: string) => {
     startTransition(async () => {
       const result = await deletePDC(id)
-      
+
       if (result.success) {
         toast.success("PDC deleted successfully")
         setDeleteId(null)
@@ -218,20 +228,62 @@ export function PDCTable({ pdcs }: PDCTableProps) {
     })
   }
 
+  // Edit functions
+  const handleEdit = (pdc: PDC) => {
+    setEditingId(pdc.id)
+    setEditingData({
+      id: pdc.id,
+      docDate: pdc.docDate,
+      refNo: pdc.refNo,
+      bankName: pdc.bankName,
+      dueDate: pdc.dueDate,
+      checkNo: pdc.checkNo,
+      amount: pdc.amount,
+      remarks: pdc.remarks || "",
+      bpCode: pdc.bpCode,
+    })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditingData(null)
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingData) return
+
+    startTransition(async () => {
+      const result = await updatePDC(editingData)
+
+      if (result.success) {
+        toast.success("PDC updated successfully")
+        setEditingId(null)
+        setEditingData(null)
+      } else {
+        toast.error(result.error || "Failed to update PDC")
+      }
+    })
+  }
+
+  const updateEditingData = (field: keyof EditingPDC, value: any) => {
+    if (!editingData) return
+    setEditingData((prev) => (prev ? { ...prev, [field]: value } : null))
+  }
+
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP'
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: "PHP",
     }).format(amount)
   }
 
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank')
+    const printWindow = window.open("", "_blank")
     if (!printWindow) return
 
     const currentDate = format(new Date(), "EEEE, MMMM dd, yyyy")
     const currentTime = format(new Date(), "hh:mm:ss a")
-    
+
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -327,7 +379,9 @@ export function PDCTable({ pdcs }: PDCTableProps) {
               </tr>
             </thead>
             <tbody>
-              ${filteredPDCs.map((pdc, index) => `
+              ${filteredPDCs
+                .map(
+                  (pdc, index) => `
                 <tr>
                   <td class="center">${index + 1}</td>
                   <td>${format(new Date(pdc.docDate), "MM/dd/yy")}</td>
@@ -338,9 +392,11 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                   <td class="amount">${formatCurrency(pdc.amount)}</td>
                   <td>${pdc.bpName}</td>
                   <td class="center status-${pdc.status.toLowerCase()}">${pdc.status}</td>
-                  <td>${pdc.remarks || 'No remarks.'}</td>
+                  <td>${pdc.remarks || "No remarks."}</td>
                 </tr>
-              `).join('')}
+              `,
+                )
+                .join("")}
             </tbody>
           </table>
         </body>
@@ -355,8 +411,16 @@ export function PDCTable({ pdcs }: PDCTableProps) {
 
   const handleExportCSV = () => {
     const headers = [
-      'ID', 'DocDate', 'Ref No', 'BankName', 'DueDate', 'CheckNo', 
-      'Amount', 'BPName', 'Status', 'Remarks'
+      "ID",
+      "DocDate",
+      "Ref No",
+      "BankName",
+      "DueDate",
+      "CheckNo",
+      "Amount",
+      "BPName",
+      "Status",
+      "Remarks",
     ]
 
     const csvData = filteredPDCs.map((pdc, index) => [
@@ -369,20 +433,17 @@ export function PDCTable({ pdcs }: PDCTableProps) {
       pdc.amount,
       pdc.bpName,
       pdc.status,
-      pdc.remarks || 'RENTAL PMT.'
+      pdc.remarks || "RENTAL PMT.",
     ])
 
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n')
+    const csvContent = [headers.join(","), ...csvData.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n")
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `PDC_Report_${format(new Date(), 'yyyy-MM-dd')}.csv`)
-    link.style.visibility = 'hidden'
+    link.setAttribute("href", url)
+    link.setAttribute("download", `PDC_Report_${format(new Date(), "yyyy-MM-dd")}.csv`)
+    link.style.visibility = "hidden"
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -410,12 +471,7 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium">Filter Options</h4>
                   {hasActiveFilters() && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearAllFilters}
-                      className="h-auto p-1 text-xs"
-                    >
+                    <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-auto p-1 text-xs">
                       Clear All
                     </Button>
                   )}
@@ -482,7 +538,7 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                     <div className="grid grid-cols-2 gap-1">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+                          <Button variant="outline" size="sm" className="h-7 text-xs px-2 bg-transparent">
                             <CalendarIcon className="mr-1 h-2 w-2" />
                             {docDateRange.from ? format(docDateRange.from, "MM/dd") : "From"}
                           </Button>
@@ -491,14 +547,14 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                           <Calendar
                             mode="single"
                             selected={docDateRange.from}
-                            onSelect={(date) => setDocDateRange(prev => ({ ...prev, from: date }))}
+                            onSelect={(date) => setDocDateRange((prev) => ({ ...prev, from: date }))}
                             initialFocus
                           />
                         </PopoverContent>
                       </Popover>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+                          <Button variant="outline" size="sm" className="h-7 text-xs px-2 bg-transparent">
                             <CalendarIcon className="mr-1 h-2 w-2" />
                             {docDateRange.to ? format(docDateRange.to, "MM/dd") : "To"}
                           </Button>
@@ -507,7 +563,7 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                           <Calendar
                             mode="single"
                             selected={docDateRange.to}
-                            onSelect={(date) => setDocDateRange(prev => ({ ...prev, to: date }))}
+                            onSelect={(date) => setDocDateRange((prev) => ({ ...prev, to: date }))}
                             initialFocus
                           />
                         </PopoverContent>
@@ -532,7 +588,7 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                     <div className="grid grid-cols-2 gap-1">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+                          <Button variant="outline" size="sm" className="h-7 text-xs px-2 bg-transparent">
                             <CalendarIcon className="mr-1 h-2 w-2" />
                             {dueDateRange.from ? format(dueDateRange.from, "MM/dd") : "From"}
                           </Button>
@@ -541,14 +597,14 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                           <Calendar
                             mode="single"
                             selected={dueDateRange.from}
-                            onSelect={(date) => setDueDateRange(prev => ({ ...prev, from: date }))}
+                            onSelect={(date) => setDueDateRange((prev) => ({ ...prev, from: date }))}
                             initialFocus
                           />
                         </PopoverContent>
                       </Popover>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+                          <Button variant="outline" size="sm" className="h-7 text-xs px-2 bg-transparent">
                             <CalendarIcon className="mr-1 h-2 w-2" />
                             {dueDateRange.to ? format(dueDateRange.to, "MM/dd") : "To"}
                           </Button>
@@ -557,7 +613,7 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                           <Calendar
                             mode="single"
                             selected={dueDateRange.to}
-                            onSelect={(date) => setDueDateRange(prev => ({ ...prev, to: date }))}
+                            onSelect={(date) => setDueDateRange((prev) => ({ ...prev, to: date }))}
                             initialFocus
                           />
                         </PopoverContent>
@@ -575,9 +631,7 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                       </Button>
                     )}
                   </div>
-                  
                 </div>
-                
 
                 <Separator />
 
@@ -590,9 +644,7 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                         <Checkbox
                           id={status.value}
                           checked={statusFilters.includes(status.value)}
-                          onCheckedChange={(checked) => 
-                            handleStatusFilterChange(status.value, checked as boolean)
-                          }
+                          onCheckedChange={(checked) => handleStatusFilterChange(status.value, checked as boolean)}
                           className="h-3 w-3"
                         />
                         <Label htmlFor={status.value} className="text-xs leading-none">
@@ -612,7 +664,8 @@ export function PDCTable({ pdcs }: PDCTableProps) {
             </div>
           )}
         </div>
-             <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
             Print
@@ -622,8 +675,6 @@ export function PDCTable({ pdcs }: PDCTableProps) {
             Export CSV
           </Button>
         </div>
-
-   
       </div>
 
       <div className="rounded-md border">
@@ -653,40 +704,177 @@ export function PDCTable({ pdcs }: PDCTableProps) {
             ) : (
               filteredPDCs.map((pdc) => (
                 <TableRow key={pdc.id}>
+                  {/* Doc Date */}
                   <TableCell>
-                    {format(new Date(pdc.docDate), "MMM dd, yyyy")}
+                    {editingId === pdc.id ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start text-left font-normal bg-transparent"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {editingData?.docDate ? format(editingData.docDate, "MMM dd, yyyy") : "Select date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={editingData?.docDate}
+                            onSelect={(date) => date && updateEditingData("docDate", date)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      format(new Date(pdc.docDate), "MMM dd, yyyy")
+                    )}
                   </TableCell>
-                  <TableCell className="font-medium">{pdc.refNo}</TableCell>
+
+                  {/* Ref No */}
+                  <TableCell className="font-medium">
+                    {editingId === pdc.id ? (
+                      <Input
+                        value={editingData?.refNo || ""}
+                        onChange={(e) => updateEditingData("refNo", e.target.value)}
+                        className="w-full"
+                      />
+                    ) : (
+                      pdc.refNo
+                    )}
+                  </TableCell>
+
+                  {/* Business Partner */}
                   <TableCell>
-                    <div>
-                      <div className="font-medium">{pdc.bpName}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {pdc.bpCode}
+                    {editingId === pdc.id ? (
+                      <Select
+                        value={editingData?.bpCode || ""}
+                        onValueChange={(value) => updateEditingData("bpCode", value)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select business partner">
+                            {editingData?.bpCode ? getTenantName(editingData.bpCode) : "Select business partner"}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tenants && tenants.length > 0 ? (
+                            tenants.map((tenant) => (
+                              <SelectItem key={tenant.bpCode} value={tenant.bpCode}>
+                                <div>
+                                  <div className="font-medium">{tenant.company || tenant.businessName}</div>
+                                  <div className="text-sm text-muted-foreground">{tenant.bpCode}</div>
+                                </div>
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="px-2 py-1.5 text-sm text-muted-foreground">No tenants available</div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div>
+                        <div className="font-medium">{pdc.bpName}</div>
+                        <div className="text-sm text-muted-foreground">{pdc.bpCode}</div>
                       </div>
-                    </div>
+                    )}
                   </TableCell>
-                  <TableCell>{pdc.bankName}</TableCell>
-                  <TableCell>{pdc.checkNo}</TableCell>
+
+                  {/* Bank Name */}
                   <TableCell>
-                    {format(new Date(pdc.dueDate), "MMM dd, yyyy")}
+                    {editingId === pdc.id ? (
+                      <Input
+                        value={editingData?.bankName || ""}
+                        onChange={(e) => updateEditingData("bankName", e.target.value)}
+                        className="w-full"
+                      />
+                    ) : (
+                      pdc.bankName
+                    )}
                   </TableCell>
+
+                  {/* Check No */}
+                  <TableCell>
+                    {editingId === pdc.id ? (
+                      <Input
+                        value={editingData?.checkNo || ""}
+                        onChange={(e) => updateEditingData("checkNo", e.target.value)}
+                        className="w-full"
+                      />
+                    ) : (
+                      pdc.checkNo
+                    )}
+                  </TableCell>
+
+                  {/* Due Date */}
+                  <TableCell>
+                    {editingId === pdc.id ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start text-left font-normal bg-transparent"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {editingData?.dueDate ? format(editingData.dueDate, "MMM dd, yyyy") : "Select date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={editingData?.dueDate}
+                            onSelect={(date) => date && updateEditingData("dueDate", date)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      format(new Date(pdc.dueDate), "MMM dd, yyyy")
+                    )}
+                  </TableCell>
+
+                  {/* Amount */}
                   <TableCell className="text-center font-medium">
-                    {formatCurrency(pdc.amount)}
+                    {editingId === pdc.id ? (
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editingData?.amount || ""}
+                        onChange={(e) => updateEditingData("amount", Number.parseFloat(e.target.value) || 0)}
+                        className="w-full text-center"
+                      />
+                    ) : (
+                      formatCurrency(pdc.amount)
+                    )}
                   </TableCell>
+
+                  {/* Remarks */}
                   <TableCell className="text-center font-medium">
-                    {pdc.remarks ? pdc.remarks : "No remarks."}
+                    {editingId === pdc.id ? (
+                      <Input
+                        value={editingData?.remarks || ""}
+                        onChange={(e) => updateEditingData("remarks", e.target.value)}
+                        className="w-full"
+                        placeholder="No remarks."
+                      />
+                    ) : pdc.remarks ? (
+                      pdc.remarks
+                    ) : (
+                      "No remarks."
+                    )}
                   </TableCell>
+
+                  {/* Status */}
                   <TableCell>
                     <Select
                       value={pdc.status}
                       onValueChange={(value) => handleStatusChange(pdc.id, value as PDC["status"])}
-                      disabled={isPending}
+                      disabled={isPending || editingId === pdc.id}
                     >
                       <SelectTrigger className="w-[120px]">
                         <SelectValue>
-                          <Badge className={statusColors[pdc.status]}>
-                            {pdc.status}
-                          </Badge>
+                          <Badge className={statusColors[pdc.status]}>{pdc.status}</Badge>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -698,6 +886,8 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                       </SelectContent>
                     </Select>
                   </TableCell>
+
+                  {/* Updated By */}
                   <TableCell>
                     <div className="text-sm">
                       {pdc.updatedBy.firstName} {pdc.updatedBy.lastName}
@@ -706,35 +896,55 @@ export function PDCTable({ pdcs }: PDCTableProps) {
                       {format(new Date(pdc.updatedAt), "MMM dd, yyyy")}
                     </div>
                   </TableCell>
+
+                  {/* Actions */}
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
+                    {editingId === pdc.id ? (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleSaveEdit}
+                          disabled={isPending}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Check className="h-4 w-4 text-green-600" />
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => navigator.clipboard.writeText(pdc.refNo)}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEdit}
+                          disabled={isPending}
+                          className="h-8 w-8 p-0"
                         >
-                          Copy reference number
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => setDeleteId(pdc.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <X className="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => navigator.clipboard.writeText(pdc.refNo)}>
+                            Copy reference number
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleEdit(pdc)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(pdc.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -748,8 +958,7 @@ export function PDCTable({ pdcs }: PDCTableProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the PDC
-              record from the system.
+              This action cannot be undone. This will permanently delete the PDC record from the system.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
