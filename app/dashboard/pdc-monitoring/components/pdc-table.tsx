@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useMemo } from "react"
+import { useState, useTransition, useMemo, useEffect } from "react"
 import { format } from "date-fns"
 import { MoreHorizontal, Pencil, Trash2, Filter, Printer, Download, CalendarIcon, X, Check } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -103,6 +103,8 @@ const statusOptions = [
   { value: "Cancelled", label: "Cancelled" },
 ]
 
+const ROWS_PER_PAGE = 15
+
 export function PDCTable({ pdcs, tenants = [] }: PDCTableProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -117,6 +119,7 @@ export function PDCTable({ pdcs, tenants = [] }: PDCTableProps) {
   const [bankNameFilter, setBankNameFilter] = useState("")
   const [docDateRange, setDocDateRange] = useState<DateRange>({ from: undefined, to: undefined })
   const [dueDateRange, setDueDateRange] = useState<DateRange>({ from: undefined, to: undefined })
+  const [currentPage, setCurrentPage] = useState(1)
 
   // Filter PDCs based on all selected filters
   const filteredPDCs = useMemo(() => {
@@ -148,6 +151,18 @@ export function PDCTable({ pdcs, tenants = [] }: PDCTableProps) {
       return true
     })
   }, [pdcs, statusFilters, bpNameFilter, bankNameFilter, docDateRange, dueDateRange])
+
+    // Reset page to 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [statusFilters, bpNameFilter, bankNameFilter, docDateRange, dueDateRange])
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredPDCs.length / ROWS_PER_PAGE)
+  const paginatedPDCs = useMemo(() => {
+    const startIndex = (currentPage - 1) * ROWS_PER_PAGE
+    return filteredPDCs.slice(startIndex, startIndex + ROWS_PER_PAGE)
+  }, [filteredPDCs, currentPage])
 
   // Get unique values for filter options
   const uniqueBankNames = useMemo(() => {
@@ -951,6 +966,34 @@ export function PDCTable({ pdcs, tenants = [] }: PDCTableProps) {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Footer with Pagination */}
+      <div className="flex items-center justify-between mt-4">
+        <div className="text-sm text-muted-foreground">
+          Showing <span className="font-medium">{filteredPDCs.length}</span> of <span className="font-medium">{pdcs.length}</span> records.
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            Page {totalPages > 0 ? currentPage : 0} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages || totalPages === 0}
+          >
+            Next
+          </Button>
+        </div>
       </div>
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
