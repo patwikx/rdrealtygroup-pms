@@ -103,7 +103,7 @@ const statusOptions = [
   { value: "Cancelled", label: "Cancelled" },
 ]
 
-const ROWS_PER_PAGE = 15
+const ROWS_PER_PAGE = 10
 
 export function PDCTable({ pdcs, tenants = [] }: PDCTableProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
