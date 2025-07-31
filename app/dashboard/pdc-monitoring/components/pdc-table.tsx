@@ -32,25 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
-
-// Mock actions - replace with your actual actions
-const deletePDC = async (id: string) => {
-  // Simulate API call
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-  return { success: true }
-}
-
-const updatePDCStatus = async ({ id, status }: { id: string; status: string }) => {
-  // Simulate API call
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-  return { success: true }
-}
-
-const updatePDC = async (data: EditingPDC) => {
-  // Simulate API call
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-  return { success: true }
-}
+import { deletePDC, updatePDCStatus, updatePDC } from "@/actions/pdc-actions"
 
 type PDC = {
   id: string
@@ -123,14 +105,12 @@ const statusOptions = [
 
 const ROWS_PER_PAGE = 15
 
-export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
+export function PDCTable({ pdcs, tenants = [] }: PDCTableProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-
   // Edit states
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingData, setEditingData] = useState<EditingPDC | null>(null)
-
   // Filter states
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [bpNameFilter, setBpNameFilter] = useState("")
@@ -146,31 +126,26 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
       if (statusFilters.length > 0 && !statusFilters.includes(pdc.status)) {
         return false
       }
-
       // BP Name filter
       if (bpNameFilter && !pdc.bpName.toLowerCase().includes(bpNameFilter.toLowerCase())) {
         return false
       }
-
       // Bank Name filter
       if (bankNameFilter && !pdc.bankName.toLowerCase().includes(bankNameFilter.toLowerCase())) {
         return false
       }
-
       // Doc Date range filter
       if (docDateRange.from || docDateRange.to) {
         const docDate = new Date(pdc.docDate)
         if (docDateRange.from && docDate < docDateRange.from) return false
         if (docDateRange.to && docDate > docDateRange.to) return false
       }
-
       // Due Date range filter
       if (dueDateRange.from || dueDateRange.to) {
         const dueDate = new Date(pdc.dueDate)
         if (dueDateRange.from && dueDate < dueDateRange.from) return false
         if (dueDateRange.to && dueDate > dueDateRange.to) return false
       }
-
       return true
     })
   }, [pdcs, statusFilters, bpNameFilter, bankNameFilter, docDateRange, dueDateRange])
@@ -180,7 +155,7 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
     setCurrentPage(1)
   }, [statusFilters, bpNameFilter, bankNameFilter, docDateRange, dueDateRange])
 
-  // Pagination logic
+  // Pagination logic - Fixed
   const totalPages = Math.ceil(filteredPDCs.length / ROWS_PER_PAGE)
   const paginatedPDCs = useMemo(() => {
     const startIndex = (currentPage - 1) * ROWS_PER_PAGE
@@ -247,7 +222,7 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
       if (result.success) {
         toast.success("PDC status updated successfully")
       } else {
-        toast.error("Failed to update PDC status")
+        toast.error(result.error || "Failed to update PDC status")
       }
     })
   }
@@ -259,7 +234,7 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
         toast.success("PDC deleted successfully")
         setDeleteId(null)
       } else {
-        toast.error("Failed to delete PDC")
+        toast.error(result.error || "Failed to delete PDC")
       }
     })
   }
@@ -287,7 +262,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
 
   const handleSaveEdit = () => {
     if (!editingData) return
-
     startTransition(async () => {
       const result = await updatePDC(editingData)
       if (result.success) {
@@ -295,7 +269,7 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
         setEditingId(null)
         setEditingData(null)
       } else {
-        toast.error("Failed to update PDC")
+        toast.error(result.error || "Failed to update PDC")
       }
     })
   }
@@ -326,8 +300,8 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
           <title>PDC ByStatus Report</title>
           <style>
             body {
-              font-family: Arial, sans-serif;
-              margin: 20px;
+               font-family: Arial, sans-serif;
+               margin: 20px;
               font-size: 12px;
             }
             .header {
@@ -359,19 +333,19 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
               font-size: 11px;
             }
             table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 10px;
+               width: 100%;
+               border-collapse: collapse;
+               margin-top: 10px;
             }
             th, td {
-              border: 1px solid #ddd;
-              padding: 6px;
-              text-align: left;
+               border: 1px solid #ddd;
+               padding: 6px;
+               text-align: left;
               font-size: 10px;
             }
             th {
-              background-color: #f5f5f5;
-              font-weight: bold;
+               background-color: #f5f5f5;
+               font-weight: bold;
             }
             .amount { text-align: right; }
             .center { text-align: center; }
@@ -484,10 +458,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
     document.body.removeChild(link)
   }
 
-  // Calculate pagination info
-  const startRecord = filteredPDCs.length === 0 ? 0 : (currentPage - 1) * ROWS_PER_PAGE + 1
-  const endRecord = Math.min(currentPage * ROWS_PER_PAGE, filteredPDCs.length)
-
   return (
     <>
       {/* Filter and Action Bar */}
@@ -515,7 +485,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                     </Button>
                   )}
                 </div>
-
                 {/* Row 1: Text Filters */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Business Partner Filter */}
@@ -541,7 +510,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       )}
                     </div>
                   </div>
-
                   {/* Bank Name Filter */}
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium">Bank Name</Label>
@@ -566,9 +534,7 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                     </div>
                   </div>
                 </div>
-
                 <Separator />
-
                 {/* Row 2: Date Ranges */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Document Date Range Filter */}
@@ -620,7 +586,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       </Button>
                     )}
                   </div>
-
                   {/* Due Date Range Filter */}
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium">Due Date</Label>
@@ -671,9 +636,7 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                     )}
                   </div>
                 </div>
-
                 <Separator />
-
                 {/* Row 3: Status Filter */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium">Status</Label>
@@ -696,14 +659,12 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
               </div>
             </PopoverContent>
           </Popover>
-
           {hasActiveFilters() && (
             <div className="text-sm text-muted-foreground">
               Showing {filteredPDCs.length} of {pdcs.length} records
             </div>
           )}
         </div>
-
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
@@ -770,7 +731,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       format(new Date(pdc.docDate), "MMM dd, yyyy")
                     )}
                   </TableCell>
-
                   {/* Ref No */}
                   <TableCell className="font-medium">
                     {editingId === pdc.id ? (
@@ -783,7 +743,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       pdc.refNo
                     )}
                   </TableCell>
-
                   {/* Business Partner */}
                   <TableCell>
                     {editingId === pdc.id ? (
@@ -818,7 +777,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       </div>
                     )}
                   </TableCell>
-
                   {/* Bank Name */}
                   <TableCell>
                     {editingId === pdc.id ? (
@@ -831,7 +789,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       pdc.bankName
                     )}
                   </TableCell>
-
                   {/* Check No */}
                   <TableCell>
                     {editingId === pdc.id ? (
@@ -844,7 +801,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       pdc.checkNo
                     )}
                   </TableCell>
-
                   {/* Due Date */}
                   <TableCell>
                     {editingId === pdc.id ? (
@@ -872,7 +828,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       format(new Date(pdc.dueDate), "MMM dd, yyyy")
                     )}
                   </TableCell>
-
                   {/* Amount */}
                   <TableCell className="text-center font-medium">
                     {editingId === pdc.id ? (
@@ -887,7 +842,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       formatCurrency(pdc.amount)
                     )}
                   </TableCell>
-
                   {/* Remarks */}
                   <TableCell className="text-center font-medium">
                     {editingId === pdc.id ? (
@@ -903,7 +857,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       "No remarks."
                     )}
                   </TableCell>
-
                   {/* Status */}
                   <TableCell>
                     <Select
@@ -925,7 +878,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       </SelectContent>
                     </Select>
                   </TableCell>
-
                   {/* Updated By */}
                   <TableCell>
                     <div className="text-sm">
@@ -935,7 +887,6 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
                       {format(new Date(pdc.updatedAt), "MMM dd, yyyy")}
                     </div>
                   </TableCell>
-
                   {/* Actions */}
                   <TableCell>
                     {editingId === pdc.id ? (
@@ -992,21 +943,15 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
         </Table>
       </div>
 
-      {/* Footer with Pagination */}
+      {/* Footer with Pagination - Fixed */}
       <div className="flex items-center justify-between mt-4">
         <div className="text-sm text-muted-foreground">
-          {filteredPDCs.length === 0 ? (
-            "No records to display"
-          ) : (
-            <>
-              Showing <span className="font-medium">{startRecord}</span> to{" "}
-              <span className="font-medium">{endRecord}</span> of{" "}
-              <span className="font-medium">{filteredPDCs.length}</span> filtered records
-              {hasActiveFilters() && <span className="text-muted-foreground"> (from {pdcs.length} total)</span>}
-            </>
-          )}
+          Showing{" "}
+          <span className="font-medium">{filteredPDCs.length === 0 ? 0 : (currentPage - 1) * ROWS_PER_PAGE + 1}</span>{" "}
+          to <span className="font-medium">{Math.min(currentPage * ROWS_PER_PAGE, filteredPDCs.length)}</span> of{" "}
+          <span className="font-medium">{filteredPDCs.length}</span> filtered records
+          {hasActiveFilters() && <span className="text-muted-foreground"> (from {pdcs.length} total)</span>}
         </div>
-
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
             Page {totalPages > 0 ? currentPage : 0} of {totalPages}
@@ -1050,106 +995,5 @@ export function PDCTable({ pdcs = [], tenants = [] }: PDCTableProps) {
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
-}
-
-// Demo component with sample data
-export default function Component() {
-  const samplePDCs: PDC[] = [
-    {
-      id: "1",
-      docDate: new Date("2024-01-15"),
-      refNo: "PDC-001",
-      bankName: "BPI",
-      dueDate: new Date("2024-02-15"),
-      checkNo: "123456",
-      amount: 50000,
-      remarks: "Monthly rental payment",
-      bpCode: "BP001",
-      bpName: "ABC Corporation",
-      status: "Open",
-      updatedAt: new Date("2024-01-15"),
-      tenant: {
-        company: "ABC Corporation",
-        businessName: "ABC Corp",
-        email: "abc@example.com",
-      },
-      updatedBy: {
-        firstName: "John",
-        lastName: "Doe",
-      },
-    },
-    {
-      id: "2",
-      docDate: new Date("2024-01-20"),
-      refNo: "PDC-002",
-      bankName: "BDO",
-      dueDate: new Date("2024-02-20"),
-      checkNo: "789012",
-      amount: 75000,
-      remarks: null,
-      bpCode: "BP002",
-      bpName: "XYZ Company",
-      status: "Deposited",
-      updatedAt: new Date("2024-01-20"),
-      tenant: {
-        company: "XYZ Company",
-        businessName: "XYZ Co",
-        email: "xyz@example.com",
-      },
-      updatedBy: {
-        firstName: "Jane",
-        lastName: "Smith",
-      },
-    },
-    // Add more sample data to test pagination
-    ...Array.from({ length: 20 }, (_, i) => ({
-      id: `${i + 3}`,
-      docDate: new Date(`2024-01-${(i % 28) + 1}`),
-      refNo: `PDC-${String(i + 3).padStart(3, "0")}`,
-      bankName: ["BPI", "BDO", "Metrobank", "Security Bank"][i % 4],
-      dueDate: new Date(`2024-02-${(i % 28) + 1}`),
-      checkNo: `${100000 + i}`,
-      amount: (i + 1) * 10000,
-      remarks: i % 3 === 0 ? null : `Payment ${i + 1}`,
-      bpCode: `BP${String(i + 3).padStart(3, "0")}`,
-      bpName: `Company ${i + 3}`,
-      status: ["Open", "Deposited", "RETURNED", "Bounced", "Cancelled"][i % 5] as PDC["status"],
-      updatedAt: new Date(`2024-01-${(i % 28) + 1}`),
-      tenant: {
-        company: `Company ${i + 3}`,
-        businessName: `Co ${i + 3}`,
-        email: `company${i + 3}@example.com`,
-      },
-      updatedBy: {
-        firstName: ["John", "Jane", "Bob", "Alice"][i % 4],
-        lastName: ["Doe", "Smith", "Johnson", "Brown"][i % 4],
-      },
-    })),
-  ]
-
-  const sampleTenants: Tenant[] = [
-    {
-      bpCode: "BP001",
-      company: "ABC Corporation",
-      businessName: "ABC Corp",
-      email: "abc@example.com",
-    },
-    {
-      bpCode: "BP002",
-      company: "XYZ Company",
-      businessName: "XYZ Co",
-      email: "xyz@example.com",
-    },
-  ]
-
-  return (
-    <div className="container mx-auto py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">PDC Management</h1>
-        <p className="text-muted-foreground">Manage your post-dated checks with filtering and pagination</p>
-      </div>
-      <PDCTable pdcs={samplePDCs} tenants={sampleTenants} />
-    </div>
   )
 }
