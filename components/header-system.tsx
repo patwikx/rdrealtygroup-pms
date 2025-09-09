@@ -80,7 +80,7 @@ const navigationGroups: NavGroup[] = [
     ]
   },
   {
-    name: "Financial Management",
+    name: "Credit & Collection",
     icon: CreditCardIcon,
     roles: [UserRole.ADMIN, UserRole.ACCTG, UserRole.MANAGER],
     items: [
