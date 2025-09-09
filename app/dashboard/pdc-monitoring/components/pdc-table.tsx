@@ -297,7 +297,7 @@ export function PDCTable({ pdcs, tenants = [] }: PDCTableProps) {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>PDC ByStatus Report</title>
+          <title>PDC Report</title>
           <style>
             body {
                font-family: Arial, sans-serif;

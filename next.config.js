@@ -19,7 +19,7 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'subdomain',
+        hostname: '4b9moeer4y.ufs.sh',
       },
       {
         protocol: 'https',

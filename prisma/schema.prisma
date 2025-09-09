@@ -44,6 +44,10 @@ model User {
   // System Relations
   auditLogs     AuditLog[]
   notifications Notification[]
+
+  // Notice Relations
+  createdNotices TenantNotice[] @relation("CreatedNotices")
+  TenantNotice   TenantNotice[]
 }
 
 model PDC {
@@ -471,6 +475,7 @@ model Tenant {
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
   pdcs                PDC[]
+  notices             TenantNotice[]
 }
 
 // Updated Lease model to support multiple units
@@ -823,4 +828,74 @@ enum FloorType {
   SECOND_FLOOR
   THIRD_FLOOR
   ROOF_TOP
+}
+
+// Tenant Notice Models
+model TenantNotice {
+  id           String     @id @default(cuid())
+  tenantId     String
+  noticeType   NoticeType
+  noticeNumber Int // 1st, 2nd, Final
+  totalAmount  Float      @default(0) // Total of all items
+  forMonth     String // July, August, etc.
+  forYear      Int // 2025, 2024, etc.
+  dateIssued   DateTime   @default(now())
+
+  // Signatories (with defaults)
+  primarySignatory String @default("DARYLL JOY ENRIQUEZ")
+  primaryTitle     String @default("Credit and Collection Officer")
+  primaryContact   String @default("+63998 585 0879")
+
+  secondarySignatory String @default("C.A.B. LAGUINDAM")
+  secondaryTitle     String @default("AVP-Finance/Controller")
+
+  // Tracking
+  isSettled   Boolean   @default(false)
+  settledDate DateTime?
+  settledBy   String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+
+  // Relations
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User         @relation("CreatedNotices", fields: [createdById], references: [id])
+  items     NoticeItem[]
+  User      User?        @relation(fields: [userId], references: [id])
+  userId    String?
+
+  @@index([tenantId])
+  @@index([createdById])
+}
+
+model NoticeItem {
+  id           String       @id @default(cuid())
+  noticeId     String
+  description  String // Space Rental, BIR 2307 Forms, etc.
+  status       NoticeStatus @default(PAST_DUE)
+  customStatus String? // For manual entry when status is CUSTOM
+  amount       Float
+  months       String? // For space rental: "July, August, September" or single month
+  createdAt    DateTime     @default(now())
+
+  // Relations
+  notice TenantNotice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+
+  @@index([noticeId])
+}
+
+enum NoticeType {
+  FIRST_NOTICE
+  SECOND_NOTICE
+  FINAL_NOTICE
+}
+
+enum NoticeStatus {
+  PAST_DUE
+  OVERDUE
+  CRITICAL
+  PENDING
+  UNPAID
+  CUSTOM
 }
