@@ -213,7 +213,7 @@ export function UnitTaxes({ taxes = [], unitId, unitNumber }: UnitTaxesProps) {
                 </TableCell>
                 <TableCell>
                   <Badge
-                    variant={tax.isPaid ? "success" : "destructive"}
+                    variant={tax.isPaid ? "default" : "destructive"}
                     className={tax.isPaid ? "bg-green-500" : "bg-red-500"}
                   >
                     {tax.isPaid ? "Paid" : "Unpaid"}

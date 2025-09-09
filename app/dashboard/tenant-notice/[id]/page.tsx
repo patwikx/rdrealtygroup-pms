@@ -52,20 +52,19 @@ export default function NoticeDetailPage({ params }: { params: { id: string } })
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const loadNotice = async () => {
+      try {
+        const noticeData = await getTenantNoticeById(params.id);
+        setNotice(noticeData as NoticeDetail);
+      } catch (error) {
+        toast.error("Failed to load notice");
+        router.push("/dashboard/tenant-notice");
+      } finally {
+        setLoading(false);
+      }
+    };
     loadNotice();
-  }, [params.id]);
-
-  const loadNotice = async () => {
-    try {
-      const noticeData = await getTenantNoticeById(params.id);
-      setNotice(noticeData as NoticeDetail);
-    } catch (error) {
-      toast.error("Failed to load notice");
-      router.push("/dashboard/tenant-notice");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [params.id, router]);
 
   const handlePrint = () => {
     window.print();
@@ -247,7 +246,7 @@ export default function NoticeDetailPage({ params }: { params: { id: string } })
 
           {/* Salutation */}
           <div className="mb-2">
-            <p className="text-sm">Dear Sir/Ma'am:</p>
+            <p className="text-sm">Dear Sir/Ma&apos;am:</p>
           </div>
 
           {/* Content */}
@@ -291,7 +290,7 @@ export default function NoticeDetailPage({ params }: { params: { id: string } })
           {/* Second paragraph for first/second notices */}
           {(notice.noticeNumber < 3 && notice.noticeType !== "FINAL_NOTICE") && (
             <div className="mb-4 text-justify leading-relaxed text-sm">
-              <p>We kindly request that you make immediate payment to prevent the imposition of interest and penalty charges. If you have any questions or concerns about your account, please don't hesitate to reach out to us. Your prompt attention to this matter is greatly appreciated. Thank you.</p>
+              <p>We kindly request that you make immediate payment to prevent the imposition of interest and penalty charges. If you have any questions or concerns about your account, please don&apos;t hesitate to reach out to us. Your prompt attention to this matter is greatly appreciated. Thank you.</p>
             </div>
           )}
 
