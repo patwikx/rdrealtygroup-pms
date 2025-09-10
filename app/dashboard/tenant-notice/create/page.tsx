@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 
 import {
   Select,
@@ -35,10 +37,14 @@ import {
   XCircle,
   CheckCircle,
   Edit3,
-  User2
+  User2,
+  Check,
+  ChevronsUpDown,
+  Search
 } from "lucide-react";
 import { toast } from "sonner";
 import { createTenantNotice, getTenants } from "@/actions/tenant-notice";
+import { cn } from "@/lib/utils";
 
 interface Tenant {
   id: string;
@@ -77,6 +83,7 @@ export default function CreateNoticePage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSignatories, setShowSignatories] = useState(false);
+  const [openTenantCombobox, setOpenTenantCombobox] = useState(false);
   const [formData, setFormData] = useState({
     tenantId: "",
     noticeType: "FIRST_NOTICE",
@@ -165,6 +172,20 @@ export default function CreateNoticePage() {
     }
   };
 
+  // Function to get signature image based on signatory name (same as detail page)
+  const getSignatureImage = (signatoryName: string) => {
+    const normalizedName = signatoryName.toLowerCase().replace(/\s+/g, '');
+    
+    // Check for common variations of the names
+    if (normalizedName.includes('daryll') || normalizedName.includes('daryl')) {
+      return '/DJE.png'; // Adjust filename as needed
+    } else if (normalizedName.includes('laguindam') || normalizedName.includes('cab') || normalizedName.includes('c.a.b')) {
+      return '/CABL.png'; // Adjust filename as needed
+    }
+    
+    return null; // No signature found
+  };
+
   // Get selected tenant for preview
   const selectedTenant = tenants.find(t => t.id === formData.tenantId);
 
@@ -241,7 +262,7 @@ export default function CreateNoticePage() {
 
     setLoading(true);
     try {
-      await createTenantNotice({
+      const newNotice = await createTenantNotice({
         ...formData,
         items: validItems.map(item => ({
           description: item.description,
@@ -253,7 +274,14 @@ export default function CreateNoticePage() {
       });
       
       toast.success("Notice created successfully!");
-      router.push("/dashboard/tenant-notice");
+      
+      // Redirect to the newly created notice's detail page
+      if (newNotice && newNotice.id) {
+        router.push(`/dashboard/tenant-notice/${newNotice.id}`);
+      } else {
+        // Fallback to list page if no ID is returned
+        router.push("/dashboard/tenant-notice");
+      }
     } catch (error) {
       toast.error("Failed to create notice");
     } finally {
@@ -278,8 +306,12 @@ export default function CreateNoticePage() {
             width: 100%;
           }
           @page {
-            margin: 0.75in;
-            size: auto;
+            margin: 0.25in;
+            size: 8.5in 11in;
+          }
+          /* Print spacing adjustments */
+          .print-area {
+            padding: 0.1in 0.15in !important;
           }
           /* Force colors to print */
           * {
@@ -297,6 +329,11 @@ export default function CreateNoticePage() {
             color: #dc2626 !important;
             -webkit-print-color-adjust: exact !important;
           }
+          /* Ensure blue text prints */
+          .print-blue {
+            color: #2563eb !important;
+            -webkit-print-color-adjust: exact !important;
+          }
           /* Ensure light blue text prints */
           .print-light-blue {
             color: #60a5fa !important;
@@ -307,6 +344,62 @@ export default function CreateNoticePage() {
             color: #1e3a8a !important;
             -webkit-print-color-adjust: exact !important;
           }
+          /* Signature styling for print */
+          .signature-container {
+            position: relative;
+          }
+          .signature-image {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            z-index: 1;
+          }
+          .signature-image-secondary {
+            position: absolute;
+            top: -22px;
+            left: 0;
+            z-index: 1;
+          }
+          .signatory-name {
+            position: relative;
+            z-index: 2;
+          }
+        }
+        
+        /* Custom text justification styles */
+        .text-justify-full {
+          text-align: justify;
+          text-justify: inter-word;
+          hyphens: auto;
+          -webkit-hyphens: auto;
+          -ms-hyphens: auto;
+        }
+        
+        .text-justify-full:after {
+          content: "";
+          display: inline-block;
+          width: 100%;
+        }
+
+        /* Signature styling for screen (preview) */
+        .signature-container {
+          position: relative;
+        }
+        .signature-image {
+          position: absolute;
+          top: -20px;
+          left: 0;
+          z-index: 1;
+        }
+        .signature-image-secondary {
+          position: absolute;
+          top: -22px;
+          left: 0;
+          z-index: 1;
+        }
+        .signatory-name {
+          position: relative;
+          z-index: 2;
         }
       `}</style>
       
@@ -330,29 +423,67 @@ export default function CreateNoticePage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-3">Basic Information</h3>
                       
                       <div className="grid grid-cols-1 gap-4">
-                        {/* Tenant Selection */}
+                        {/* Tenant Selection with Combobox */}
                         <div className="space-y-1.5">
                           <Label htmlFor="tenant" className="flex items-center gap-2 text-sm font-medium">
                             <User2 className="h-4 w-4 text-gray-600" />
                             Select Tenant <span className="text-red-500">*</span>
                           </Label>
-                          <Select
-                            value={formData.tenantId}
-                            onValueChange={(value) => setFormData({ ...formData, tenantId: value })}
-                          >
-                            <SelectTrigger className="h-11">
-                              <SelectValue placeholder="Choose a tenant..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {tenants.map((tenant) => (
-                                <SelectItem key={tenant.id} value={tenant.id}>
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">{tenant.bpCode} — {tenant.businessName}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Popover open={openTenantCombobox} onOpenChange={setOpenTenantCombobox}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={openTenantCombobox}
+                                className="w-full justify-between h-11"
+                              >
+                                {formData.tenantId
+                                  ? (() => {
+                                      const tenant = tenants.find((t) => t.id === formData.tenantId);
+                                      return tenant ? `${tenant.bpCode} — ${tenant.businessName}` : "Select tenant...";
+                                    })()
+                                  : "Select tenant..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput 
+                                  placeholder="Search tenant..." 
+                                  className="h-9" 
+                                />
+                                <CommandEmpty>No tenant found.</CommandEmpty>
+                                <CommandGroup className="max-h-64 overflow-y-auto">
+                                  {tenants.map((tenant) => (
+                                    <CommandItem
+                                      key={tenant.id}
+                                      value={`${tenant.bpCode} ${tenant.businessName} ${tenant.firstName || ''} ${tenant.lastName || ''} ${tenant.company}`}
+                                      onSelect={() => {
+                                        setFormData({ ...formData, tenantId: tenant.id });
+                                        setOpenTenantCombobox(false);
+                                      }}
+                                      className="cursor-pointer"
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          formData.tenantId === tenant.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{tenant.bpCode} — {tenant.businessName}</span>
+                                        {(tenant.firstName || tenant.lastName) && (
+                                          <span className="text-sm text-gray-500">
+                                            {[tenant.firstName, tenant.lastName].filter(Boolean).join(' ')}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
@@ -756,7 +887,7 @@ export default function CreateNoticePage() {
           </div>
 
           {/* Preview Section - Right Side */}
-          <div className="w-1/2">
+          <div className="w-[1000px]">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -765,28 +896,44 @@ export default function CreateNoticePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="print-area bg-white pt-1 px-4 pb-4 text-xs">
-                  {/* Header */}
-                  <div className="mb-3">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="text-xs mb-1">{new Date().toLocaleDateString('en-US', { 
+                <div className="print-area max-w-4xl mx-auto bg-white print:shadow-none print:max-w-none print:mx-0">
+                  <div className="p-8 print:p-1 print:pt-6">
+                    {/* Header with embedded content */}
+                    <div className="flex justify-between items-start mb-6">
+                      {/* Left side - Date, Company, and Content */}
+                      <div className="flex-1 print:pl-0">
+                        {/* Date and Company Info */}
+                        <div className="text-sm mb-3">{new Date().toLocaleDateString('en-US', { 
                           year: 'numeric', 
                           month: 'long', 
                           day: '2-digit' 
                         })}</div>
-                        <div className="font-bold text-sm mb-1">
+                        <div className="font-bold text-lg mb-1">
                           {selectedTenant ? selectedTenant.businessName.toUpperCase() : 'SELECT TENANT'}
                         </div>
-                        <div className="text-xs">General Santos City</div>
+                        <div className="text-sm mb-6">General Santos City</div>
+                        
+                        {/* Title - now positioned at the same level as Philippines */}
+                        <div className="text-center mb-4 mt-16">
+                          <h2 className="text-base font-bold underline ml-48">
+                            {getNoticeTitle(formData.noticeType)}
+                          </h2>
+                        </div>
+                        
+                        {/* Salutation */}
+                        <div className="mt-6">
+                          <p className="text-sm">Dear Sir/Ma&apos;am:</p>
+                        </div>
                       </div>
-                      <div className="text-right">
+                      
+                      {/* Right side - Company Header */}
+                      <div className="text-right mr-[-20px] mt-[-30px] print:pr-1">
                         <div className="mb-1 flex items-center justify-center">
                           <Image 
                             src='/rdrdc.png' 
                             alt="RD Realty Development Corporation Logo" 
-                            width={60}
-                            height={60}
+                            width={80}
+                            height={80}
                             className="object-contain"
                             unoptimized={true}
                             onError={(e) => {
@@ -794,7 +941,7 @@ export default function CreateNoticePage() {
                             }}
                           />
                         </div>
-                        <div className="text-xs font-bold mb-1 text-center">RD Realty Development Corporation</div>
+                        <div className="text-sm font-bold mb-1 text-center">RD Realty Development Corporation</div>
                         <div className="border-b border-gray-400 mb-1"></div>
                         <div className="text-xs text-gray-500 leading-tight text-left">
                           Cagampang Ext., Santiago Subdivision<br />
@@ -807,117 +954,134 @@ export default function CreateNoticePage() {
                         <div className="border-b border-gray-400 mt-1"></div>
                       </div>
                     </div>
-                    
-                    <div className="text-center mt-2">
-                      <h2 className="text-sm font-bold underline">
-                        {getNoticeTitle(formData.noticeType)}
-                      </h2>
-                    </div>
-                  </div>
 
-                  {/* Salutation */}
-                  <div className="mb-2">
-                    <p className="text-xs">Dear Sir/Ma&apos;am:</p>
-                  </div>
-
-                  {/* Content */}
-                  <div className="mb-3 text-justify leading-relaxed text-xs">
-                    <p>
-                      {getNoticeContent(formData.noticeType).beforeAmount}
-                      <span className="font-bold underline">
-                        {getNoticeContent(formData.noticeType).amount}
-                      </span>
-                      {getNoticeContent(formData.noticeType).afterAmount}
-                    </p>
-                  </div>
-
-                  {/* Amount Table */}
-                  <div className="mb-3">
-                    <table className="w-full border-collapse text-xs">
-                      <tbody>
-                        {items.filter(item => item.description || item.amount).map((item, index) => {
-                          const displayStatus = item.status === "CUSTOM" ? item.customStatus : item.status.replace('_', ' ');
-                          const displayMonths = formatMonthRange(item.months);
-                          
-                          return (
-                            <tr key={index} className="border-b border-black">
-                              <td className="px-1 py-1 font-semibold">{item.description || 'Description'}</td>
-                              <td className="px-1 py-1 font-semibold text-center">{displayStatus}</td>
-                              <td className="px-1 py-1 font-semibold text-center">{displayMonths} {formData.forYear}</td>
-                              <td className="px-1 py-1 font-semibold text-right">₱{(parseFloat(item.amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            </tr>
-                          );
-                        })}
-                        <tr className="bg-yellow-200 print-yellow border-b border-black">
-                          <td className="px-1 py-1 font-bold" colSpan={3}>Total Outstanding Balance</td>
-                          <td className="px-1 py-1 font-bold text-right">₱{totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Second paragraph for first/second notices */}
-                  {formData.noticeType !== "FINAL_NOTICE" && (
-                    <div className="mb-3 text-justify leading-relaxed text-xs">
-                      <p>We kindly request that you make immediate payment to prevent the imposition of interest and penalty charges. If you have any questions or concerns about your account, please don&apos;t hesitate to reach out to us. Your prompt attention to this matter is greatly appreciated. Thank you.</p>
-                    </div>
-                  )}
-
-                  {/* Final notice warning */}
-                  {formData.noticeType === "FINAL_NOTICE" && (
-                    <div className="mb-3 text-justify leading-relaxed text-xs">
-                      <p>
-                        {getFinalNoticeWarning().beforeWarning}
-                        <span className="font-bold">
-                          {getFinalNoticeWarning().warning}
+                    {/* Content - Full Width Outside Flex Container */}
+                    <div className="leading-normal text-sm" style={{ textAlign: 'justify', textJustify: 'inter-word' }}>
+                      <p style={{ textAlign: 'justify', textJustify: 'inter-word' }}>
+                        {getNoticeContent(formData.noticeType).beforeAmount}
+                        <span className="font-bold underline">
+                          {getNoticeContent(formData.noticeType).amount}
                         </span>
-                        {getFinalNoticeWarning().afterWarning}
+                        {getNoticeContent(formData.noticeType).afterAmount}
                       </p>
                     </div>
-                  )}
 
-                  {/* Closing */}
-                  <div className="mb-8">
-                    <p className="text-xs">Very truly yours,</p>
-                  </div>
+                    {/* Amount Table */}
+                    <div className="mb-3 mt-3">
+                      <table className="w-full border-collapse">
+                        <tbody>
+                          {items.filter(item => item.description || item.amount).map((item, index) => {
+                            const displayStatus = item.status === "CUSTOM" ? item.customStatus : item.status.replace('_', ' ');
+                            const displayMonths = formatMonthRange(item.months);
+                            
+                            return (
+                              <tr key={index} className="border-b border-black">
+                                <td className="px-1 py-1 font-semibold text-xs">{item.description || 'Description'}</td>
+                                <td className="px-1 py-1 font-semibold text-center text-xs">{displayStatus}</td>
+                                <td className="px-1 py-1 font-semibold text-center text-xs">{displayMonths} {formData.forYear}</td>
+                                <td className="px-1 py-1 font-semibold text-right text-xs">₱{(parseFloat(item.amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              </tr>
+                            );
+                          })}
+                          <tr className="bg-yellow-200 print-yellow border-b border-black">
+                            <td className="px-1 py-1 font-bold text-xs" colSpan={3}>Total Outstanding Balance</td>
+                            <td className="px-1 py-1 font-bold text-right text-xs">₱{totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
 
-                  {/* Signatories */}
-                  <div className="mb-6">
+                    {/* Second paragraph for first/second notices */}
+                    {formData.noticeType !== "FINAL_NOTICE" && (
+                      <div className="mb-3 text-justify-full leading-normal text-sm" style={{ textAlign: 'justify', textJustify: 'inter-word' }}>
+                        <p style={{ textAlign: 'justify', textJustify: 'inter-word' }}>We kindly request that you make immediate payment to prevent the imposition of interest and penalty charges. If you have any questions or concerns about your account, please don&apos;t hesitate to reach out to us. Your prompt attention to this matter is greatly appreciated. Thank you.</p>
+                      </div>
+                    )}
+
+                    {/* Final notice warning - appears after table */}
+                    {formData.noticeType === "FINAL_NOTICE" && (
+                      <div className="mb-3 text-justify-full leading-normal text-xs" style={{ textAlign: 'justify', textJustify: 'inter-word' }}>
+                        <p style={{ textAlign: 'justify', textJustify: 'inter-word' }}>
+                          {getFinalNoticeWarning().beforeWarning}
+                          <span className="font-bold">
+                            {getFinalNoticeWarning().warning}
+                          </span>
+                          {getFinalNoticeWarning().afterWarning}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Closing */}
                     <div className="mb-6">
-                      <div className="font-bold underline text-xs">{formData.primarySignatory}</div>
-                      <div className="text-xs">{formData.primaryTitle}</div>
-                      <div className="text-xs">Mobile: {formData.primaryContact}</div>
+                      <p className="text-sm">Very truly yours,</p>
                     </div>
-                    
-                    <div className="mb-1">
-                      <div className="text-xs">Noted By:</div>
-                    </div>
-                    
-                    <div className="mt-6">
-                      <div className="font-bold underline text-xs">{formData.secondarySignatory}</div>
-                      <div className="text-xs">{formData.secondaryTitle}</div>
-                    </div>
-                  </div>
 
-                  {/* Received Section */}
-                  <div className="mb-4">
-                    <div className="flex justify-between">
-                      <div className="flex-1 mr-4">
-                        <div className="text-xs">Received by: ________________________</div>
-                        <div className="text-center text-xs mt-1">Printed Name/ Signature/ CP No.</div>
+                    {/* Signatories with E-Signatures */}
+                    <div className="mb-4">
+                      {/* Primary Signatory */}
+                      <div className="mb-4 signature-container">
+                        {getSignatureImage(formData.primarySignatory) && (
+                          <Image 
+                            src={getSignatureImage(formData.primarySignatory)!}
+                            alt={`${formData.primarySignatory} signature`}
+                            width={80}
+                            height={25}
+                            className="signature-image mt-[-50px] ml-6 object-contain"
+                            unoptimized={true}
+                            onError={(e) => {
+                              console.error('Primary signature failed to load:', e);
+                            }}
+                          />
+                        )}
+                        <div className="font-bold underline text-xs signatory-name">{formData.primarySignatory}</div>
+                        <div className="text-xs">{formData.primaryTitle}</div>
+                        <div className="text-xs">Mobile: {formData.primaryContact}</div>
                       </div>
-                      <div className="flex-1 text-center">
-                        <div className="text-xs">________________________</div>
-                        <div className="text-xs mt-1">Date/Time</div>
+                      
+                      <div className="mb-1">
+                        <div className="text-xs">Noted By:</div>
+                      </div>
+                      
+                      {/* Secondary Signatory */}
+                      <div className="mt-4 signature-container">
+                        {getSignatureImage(formData.secondarySignatory) && (
+                          <Image 
+                            src={getSignatureImage(formData.secondarySignatory)!}
+                            alt={`${formData.secondarySignatory} signature`}
+                            width={150}
+                            height={70}
+                            className="signature-image-secondary mt-[-20px] ml-[-15px] object-contain"
+                            unoptimized={true}
+                            onError={(e) => {
+                              console.error('Secondary signature failed to load:', e);
+                            }}
+                          />
+                        )}
+                        <div className="font-bold underline text-xs signatory-name">{formData.secondarySignatory}</div>
+                        <div className="text-xs">{formData.secondaryTitle}</div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Footer Note */}
-                  <div className="mt-4 text-xs text-red-500 print-red leading-tight">
-                    <p className="font-semibold">NOTE: PLEASE SUBMIT BIR FORM 2307 SO WE CAN DEDUCT IT FROM YOUR ACCOUNT.</p>
-                    <p className="text-blue-400 print-light-blue">Should payment have been made thru the bank, kindly send proof of payment to <span className="underline text-blue-900 print-navy-blue">collectiongroup@rdrealty.com.ph</span></p>
-                    <p className="italic text-blue-900 print-navy-blue">Thank you!</p>
+                    {/* Received Section */}
+                    <div className="mb-3">
+                      <div className="flex justify-between items-end">
+                        <div className="flex-1 mr-4">
+                          <div className="text-xs">Received by: ____________________</div>
+                          <div className="text-center text-[10px] mt-1">Printed Name/ Signature/ CP No.</div>
+                        </div>
+                        <div className="flex-1 text-center">
+                          <div className="text-xs">____________________</div>
+                          <div className="text-[10px] mt-1">Date/Time</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Note */}
+                    <div className="mt-10 text-[10px] text-red-500 print-red leading-tight">
+                      <p className="font-semibold">NOTE: PLEASE SUBMIT BIR FORM 2307 SO WE CAN DEDUCT IT FROM YOUR ACCOUNT.</p>
+                      <p className="text-blue-400 print-light-blue">Should payment have been made thru the bank, kindly send proof of payment to <span className="underline text-blue-900 print-navy-blue">collectiongroup@rdrealty.com.ph</span></p>
+                      <p className="italic text-blue-900 print-navy-blue">Thank you!</p>
+                    </div>
                   </div>
                 </div>
               </CardContent>

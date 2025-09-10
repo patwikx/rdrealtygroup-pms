@@ -143,8 +143,15 @@ export async function getTenantNotices(filters?: {
     const notices = await prisma.tenantNotice.findMany({
       where: {
         ...(filters?.tenantId && { tenantId: filters.tenantId }),
-        ...(filters?.status && { status: filters.status as any }),
         ...(filters?.isSettled !== undefined && { isSettled: filters.isSettled }),
+        // Filter by status through the items relation
+        ...(filters?.status && {
+          items: {
+            some: {
+              status: filters.status as any
+            }
+          }
+        }),
       },
       include: {
         tenant: {
