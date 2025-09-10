@@ -40,10 +40,11 @@ import {
   User2,
   Check,
   ChevronsUpDown,
-  Search
+  Search,
+  Info
 } from "lucide-react";
 import { toast } from "sonner";
-import { createTenantNotice, getTenants } from "@/actions/tenant-notice";
+import { createTenantNotice, getTenants, getTenantNoticeCount } from "@/actions/tenant-notice";
 import { cn } from "@/lib/utils";
 
 interface Tenant {
@@ -84,10 +85,12 @@ export default function CreateNoticePage() {
   const [loading, setLoading] = useState(false);
   const [showSignatories, setShowSignatories] = useState(false);
   const [openTenantCombobox, setOpenTenantCombobox] = useState(false);
+  const [tenantNoticeCount, setTenantNoticeCount] = useState<number>(0);
+  const [loadingNoticeCount, setLoadingNoticeCount] = useState(false);
+  
   const [formData, setFormData] = useState({
     tenantId: "",
-    noticeType: "FIRST_NOTICE",
-    forYear: new Date().getFullYear().toString(),
+    noticeType: "FIRST_NOTICE", // This will be auto-determined based on existing notices
     primarySignatory: "DARYLL JOY ENRIQUEZ",
     primaryTitle: "Credit and Collection Officer",
     primaryContact: "+63998 585 0879",
@@ -102,6 +105,7 @@ export default function CreateNoticePage() {
     customStatus: string;
     amount: string;
     months: string[];
+    year: string; // Added year to each item
   }>>([
     { 
       description: "", 
@@ -109,13 +113,24 @@ export default function CreateNoticePage() {
       status: "PAST_DUE", 
       customStatus: "", 
       amount: "",
-      months: [MONTHS[new Date().getMonth()]] // Default to current month
+      months: [MONTHS[new Date().getMonth()]], // Default to current month
+      year: new Date().getFullYear().toString() // Default to current year
     }
   ]);
 
   useEffect(() => {
     loadTenants();
   }, []);
+
+  // Auto-determine notice type when tenant changes
+  useEffect(() => {
+    if (formData.tenantId) {
+      checkTenantNoticeCount();
+    } else {
+      setTenantNoticeCount(0);
+      setFormData(prev => ({ ...prev, noticeType: "FIRST_NOTICE" }));
+    }
+  }, [formData.tenantId]);
 
   const loadTenants = async () => {
     try {
@@ -126,6 +141,62 @@ export default function CreateNoticePage() {
     }
   };
 
+  const checkTenantNoticeCount = async () => {
+    if (!formData.tenantId) return;
+    
+    setLoadingNoticeCount(true);
+    try {
+      const count = await getTenantNoticeCount(formData.tenantId);
+      setTenantNoticeCount(count);
+      
+      // Auto-determine notice type based on count
+      let noticeType = "FIRST_NOTICE";
+      if (count === 1) noticeType = "SECOND_NOTICE";
+      else if (count >= 2) noticeType = "FINAL_NOTICE";
+      
+      setFormData(prev => ({ ...prev, noticeType }));
+    } catch (error) {
+      console.error("Error checking notice count:", error);
+      toast.error("Failed to check existing notices");
+    } finally {
+      setLoadingNoticeCount(false);
+    }
+  };
+
+  // Helper function to get notice type info
+  const getNoticeTypeInfo = (type: string, count: number) => {
+    switch (type) {
+      case "FIRST_NOTICE":
+        return {
+          label: "First Notice",
+          color: "text-green-600 bg-green-50 border-green-200",
+          icon: <div className="w-2 h-2 bg-green-500 rounded-full"></div>,
+          description: count === 0 ? "This will be the first notice for this tenant" : "No unsettled notices found"
+        };
+      case "SECOND_NOTICE":
+        return {
+          label: "Second Notice",
+          color: "text-yellow-600 bg-yellow-50 border-yellow-200",
+          icon: <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>,
+          description: `Tenant has ${count} unsettled notice(s). This will be their second notice.`
+        };
+      case "FINAL_NOTICE":
+        return {
+          label: "Final Notice",
+          color: "text-red-600 bg-red-50 border-red-200",
+          icon: <AlertTriangle className="h-4 w-4 text-red-500" />,
+          description: `Tenant has ${count} unsettled notice(s). This will be their final notice.`
+        };
+      default:
+        return {
+          label: "Unknown",
+          color: "text-gray-600 bg-gray-50 border-gray-200",
+          icon: <div className="w-2 h-2 bg-gray-500 rounded-full"></div>,
+          description: ""
+        };
+    }
+  };
+
   const addItem = () => {
     setItems([...items, { 
       description: "", 
@@ -133,7 +204,8 @@ export default function CreateNoticePage() {
       status: "PAST_DUE", 
       customStatus: "", 
       amount: "",
-      months: [MONTHS[new Date().getMonth()]] // Default to current month
+      months: [MONTHS[new Date().getMonth()]], // Default to current month
+      year: new Date().getFullYear().toString() // Default to current year
     }]);
   };
 
@@ -268,9 +340,10 @@ export default function CreateNoticePage() {
           description: item.description,
           status: item.status === "CUSTOM" ? item.customStatus : item.status,
           amount: parseFloat(item.amount),
-          months: formatMonthRange(item.months)
+          months: formatMonthRange(item.months),
+          year: parseInt(item.year)
         })),
-        forYear: parseInt(formData.forYear)
+        forYear: new Date().getFullYear() // Default year for the notice document
       });
       
       toast.success("Notice created successfully!");
@@ -288,6 +361,8 @@ export default function CreateNoticePage() {
       setLoading(false);
     }
   };
+
+  const noticeTypeInfo = getNoticeTypeInfo(formData.noticeType, tenantNoticeCount);
 
   return (
     <>
@@ -486,64 +561,28 @@ export default function CreateNoticePage() {
                           </Popover>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                          {/* Notice Type */}
-                          <div className="space-y-1.5">
-                            <Label htmlFor="noticeType" className="flex items-center gap-2 text-sm font-medium">
-                              <FileText className="h-4 w-4 text-gray-600" />
-                              Notice Type
-                            </Label>
-                            <Select
-                              value={formData.noticeType}
-                              onValueChange={(value) => setFormData({ ...formData, noticeType: value })}
-                            >
-                              <SelectTrigger className="h-11">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="FIRST_NOTICE">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                    First Notice
-                                  </div>
-                                </SelectItem>
-                                <SelectItem value="SECOND_NOTICE">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                                    Second Notice
-                                  </div>
-                                </SelectItem>
-                                <SelectItem value="FINAL_NOTICE">
-                                  <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                                    <span className="text-red-600 font-medium">Final Notice</span>
-                                  </div>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {/* Year */}
-                          <div className="space-y-1.5">
-                            <Label htmlFor="forYear" className="flex items-center gap-2 text-sm font-medium">
-                              <Calendar className="h-4 w-4 text-gray-600" />
-                              For Year
-                            </Label>
-                            <Select
-                              value={formData.forYear}
-                              onValueChange={(value) => setFormData({ ...formData, forYear: value })}
-                            >
-                              <SelectTrigger className="h-11">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {YEARS.map((year) => (
-                                  <SelectItem key={year} value={year.toString()}>
-                                    {year}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                        {/* Notice Type - Auto-determined with status info */}
+                        <div className="space-y-1.5">
+                          <Label htmlFor="noticeType" className="flex items-center gap-2 text-sm font-medium">
+                            <FileText className="h-4 w-4 text-gray-600" />
+                            Notice Type {loadingNoticeCount && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>}
+                          </Label>
+                          <div className={`rounded-lg border-2 p-3 ${noticeTypeInfo.color}`}>
+                            <div className="flex items-center gap-2 mb-1">
+                              {noticeTypeInfo.icon}
+                              <span className="font-semibold text-sm">{noticeTypeInfo.label}</span>
+                            </div>
+                            {formData.tenantId && (
+                              <div className="flex items-start gap-1 text-xs">
+                                <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                <span>{noticeTypeInfo.description}</span>
+                              </div>
+                            )}
+                            {!formData.tenantId && (
+                              <div className="text-xs opacity-75">
+                                Select a tenant to determine notice type
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -651,8 +690,8 @@ export default function CreateNoticePage() {
                                 </div>
                               </div>
 
-                              {/* Second Row: Months and Amount */}
-                              <div className="grid grid-cols-2 gap-3">
+                              {/* Second Row: Months, Year, and Amount */}
+                              <div className="grid grid-cols-3 gap-3">
                                 <div className="space-y-1.5">
                                   <Label className="flex items-center gap-2 text-sm font-medium">
                                     <Calendar className="h-4 w-4 text-gray-600" />
@@ -689,6 +728,28 @@ export default function CreateNoticePage() {
                                           />
                                           <span className="text-sm">{month}</span>
                                         </div>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <Label className="flex items-center gap-2 text-sm font-medium">
+                                    <Calendar className="h-4 w-4 text-gray-600" />
+                                    Year <span className="text-red-500">*</span>
+                                  </Label>
+                                  <Select
+                                    value={item.year}
+                                    onValueChange={(value) => updateItem(index, 'year', value)}
+                                  >
+                                    <SelectTrigger className="h-11">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {YEARS.map((year) => (
+                                        <SelectItem key={year} value={year.toString()}>
+                                          {year}
+                                        </SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
@@ -868,8 +929,8 @@ export default function CreateNoticePage() {
                     </Button>
                     <Button 
                       type="submit" 
-                      disabled={loading}
-                      className="px-6 bg-blue-600 hover:bg-blue-700"
+                      disabled={loading || !formData.tenantId}
+                      className="px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
                     >
                       {loading ? (
                         <>
@@ -978,7 +1039,7 @@ export default function CreateNoticePage() {
                               <tr key={index} className="border-b border-black">
                                 <td className="px-1 py-1 font-semibold text-xs">{item.description || 'Description'}</td>
                                 <td className="px-1 py-1 font-semibold text-center text-xs">{displayStatus}</td>
-                                <td className="px-1 py-1 font-semibold text-center text-xs">{displayMonths} {formData.forYear}</td>
+                                <td className="px-1 py-1 font-semibold text-center text-xs">{displayMonths} {item.year}</td>
                                 <td className="px-1 py-1 font-semibold text-right text-xs">₱{(parseFloat(item.amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               </tr>
                             );

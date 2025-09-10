@@ -254,7 +254,7 @@ export default function NoticeDetailPage({ params }: { params: { id: string } })
         <div className="print-area max-w-4xl mx-auto bg-white print:shadow-none print:max-w-none print:mx-0">
           <div className="p-8 print:p-1 print:pt-6">
             {/* Header with embedded content */}
-            <div className="flex justify-between items-start mb-6">
+            <div className="flex justify-between items-start">
               {/* Left side - Date, Company, and Content */}
               <div className="flex-1 print:pl-0">
                 {/* Date and Company Info */}
