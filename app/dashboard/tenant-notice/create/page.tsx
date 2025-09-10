@@ -17,15 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  User, 
-  FileText, 
-  Calendar, 
-  Plus, 
-  Trash2, 
-  Building, 
-  Phone, 
-  UserCheck, 
+import {
+  User,
+  FileText,
+  Calendar,
+  Plus,
+  Trash2,
+  Building,
+  Phone,
+  UserCheck,
   DollarSign,
   AlertTriangle,
   Eye,
@@ -87,10 +87,10 @@ export default function CreateNoticePage() {
   const [openTenantCombobox, setOpenTenantCombobox] = useState(false);
   const [tenantNoticeCount, setTenantNoticeCount] = useState<number>(0);
   const [loadingNoticeCount, setLoadingNoticeCount] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     tenantId: "",
-    noticeType: "FIRST_NOTICE", // This will be auto-determined based on existing notices
+    noticeType: "FIRST_NOTICE",
     primarySignatory: "DARYLL JOY ENRIQUEZ",
     primaryTitle: "Credit and Collection Officer",
     primaryContact: "+63998 585 0879",
@@ -105,16 +105,16 @@ export default function CreateNoticePage() {
     customStatus: string;
     amount: string;
     months: string[];
-    year: string; // Added year to each item
+    year: string;
   }>>([
-    { 
-      description: "", 
-      itemType: "space_rental",
-      status: "PAST_DUE", 
-      customStatus: "", 
+    {
+      description: "",
+      itemType: "", // Changed from "space_rental" to ""
+      status: "PAST_DUE",
+      customStatus: "",
       amount: "",
-      months: [MONTHS[new Date().getMonth()]], // Default to current month
-      year: new Date().getFullYear().toString() // Default to current year
+      months: [MONTHS[new Date().getMonth()]],
+      year: new Date().getFullYear().toString()
     }
   ]);
 
@@ -122,7 +122,6 @@ export default function CreateNoticePage() {
     loadTenants();
   }, []);
 
-  // Auto-determine notice type when tenant changes
   useEffect(() => {
     if (formData.tenantId) {
       checkTenantNoticeCount();
@@ -143,17 +142,16 @@ export default function CreateNoticePage() {
 
   const checkTenantNoticeCount = async () => {
     if (!formData.tenantId) return;
-    
+
     setLoadingNoticeCount(true);
     try {
       const count = await getTenantNoticeCount(formData.tenantId);
       setTenantNoticeCount(count);
-      
-      // Auto-determine notice type based on count
+
       let noticeType = "FIRST_NOTICE";
       if (count === 1) noticeType = "SECOND_NOTICE";
       else if (count >= 2) noticeType = "FINAL_NOTICE";
-      
+
       setFormData(prev => ({ ...prev, noticeType }));
     } catch (error) {
       console.error("Error checking notice count:", error);
@@ -163,7 +161,6 @@ export default function CreateNoticePage() {
     }
   };
 
-  // Helper function to get notice type info
   const getNoticeTypeInfo = (type: string, count: number) => {
     switch (type) {
       case "FIRST_NOTICE":
@@ -198,14 +195,14 @@ export default function CreateNoticePage() {
   };
 
   const addItem = () => {
-    setItems([...items, { 
-      description: "", 
-      itemType: "space_rental",
-      status: "PAST_DUE", 
-      customStatus: "", 
+    setItems([...items, {
+      description: "",
+      itemType: "", // Changed from "space_rental" to ""
+      status: "PAST_DUE",
+      customStatus: "",
       amount: "",
-      months: [MONTHS[new Date().getMonth()]], // Default to current month
-      year: new Date().getFullYear().toString() // Default to current year
+      months: [MONTHS[new Date().getMonth()]],
+      year: new Date().getFullYear().toString()
     }]);
   };
 
@@ -216,25 +213,22 @@ export default function CreateNoticePage() {
   };
 
   const updateItem = (index: number, field: string, value: string | string[] | boolean) => {
-    const updatedItems = items.map((item, i) => 
+    const updatedItems = items.map((item, i) =>
       i === index ? { ...item, [field]: value } : item
     );
     setItems(updatedItems);
   };
 
-  // Helper function to format month ranges
   const formatMonthRange = (months: string[]) => {
     if (months.length <= 1) return months[0] || MONTHS[new Date().getMonth()];
-    
-    // Sort months by their index in MONTHS array
+
     const sortedMonths = months.sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
-    
-    // Check if months are consecutive
+
     const monthIndices = sortedMonths.map(month => MONTHS.indexOf(month));
-    const isConsecutive = monthIndices.every((index, i) => 
+    const isConsecutive = monthIndices.every((index, i) =>
       i === 0 || index === monthIndices[i - 1] + 1
     );
-    
+
     if (isConsecutive && months.length > 2) {
       return `${sortedMonths[0]} — ${sortedMonths[sortedMonths.length - 1]}`;
     } else if (months.length === 2) {
@@ -244,30 +238,25 @@ export default function CreateNoticePage() {
     }
   };
 
-  // Function to get signature image based on signatory name (same as detail page)
   const getSignatureImage = (signatoryName: string) => {
     const normalizedName = signatoryName.toLowerCase().replace(/\s+/g, '');
-    
-    // Check for common variations of the names
+
     if (normalizedName.includes('daryll') || normalizedName.includes('daryl')) {
-      return '/DJE.png'; // Adjust filename as needed
+      return '/DJE.png';
     } else if (normalizedName.includes('laguindam') || normalizedName.includes('cab') || normalizedName.includes('c.a.b')) {
-      return '/CABL.png'; // Adjust filename as needed
+      return '/CABL.png';
     }
-    
-    return null; // No signature found
+
+    return null;
   };
 
-  // Get selected tenant for preview
   const selectedTenant = tenants.find(t => t.id === formData.tenantId);
 
-  // Calculate total amount for preview
   const totalAmount = items.reduce((sum, item) => {
     const amount = parseFloat(item.amount) || 0;
     return sum + amount;
   }, 0);
 
-  // Preview helper functions (same as detail page)
   const getNoticeTitle = (type: string) => {
     if (type === "FINAL_NOTICE") {
       return "FINAL NOTICE AND WARNING";
@@ -277,7 +266,7 @@ export default function CreateNoticePage() {
 
   const getNoticeContent = (type: string) => {
     const formattedAmount = `₱${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    
+
     if (type === "FINAL_NOTICE") {
       return {
         beforeAmount: "Our records show that to date, we have not yet received the full payment of your outstanding balance amounting to ",
@@ -285,7 +274,7 @@ export default function CreateNoticePage() {
         afterAmount: ", despite repeated demands. Below listed are the details of your unsettled account:"
       };
     }
-    
+
     return {
       beforeAmount: "This is to remind you of your unsettled accounts with RD Realty Development Corporation amounting to ",
       amount: formattedAmount,
@@ -303,30 +292,29 @@ export default function CreateNoticePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.tenantId) {
       toast.error("Please select a tenant");
       return;
     }
 
-    // Validate items
     const validItems = items.filter(item => {
       const hasDescription = item.description.trim();
       const hasAmount = item.amount && parseFloat(item.amount) > 0;
       const hasValidStatus = item.status !== "CUSTOM" || (item.status === "CUSTOM" && item.customStatus.trim());
-      return hasDescription && hasAmount && hasValidStatus;
+      const hasItemType = item.itemType.trim(); // New validation for item type
+      return hasDescription && hasAmount && hasValidStatus && hasItemType;
     });
-    
+
     if (validItems.length === 0) {
-      toast.error("Please add at least one valid item with description, amount, and status");
+      toast.error("Please add at least one valid item with description, type, amount, and status");
       return;
     }
 
-    // Check for custom status validation
-    const invalidCustomItems = items.filter(item => 
+    const invalidCustomItems = items.filter(item =>
       item.status === "CUSTOM" && !item.customStatus.trim()
     );
-    
+
     if (invalidCustomItems.length > 0) {
       toast.error("Please enter custom status for all items marked as 'Custom'");
       return;
@@ -343,16 +331,14 @@ export default function CreateNoticePage() {
           months: formatMonthRange(item.months),
           year: parseInt(item.year)
         })),
-        forYear: new Date().getFullYear() // Default year for the notice document
+        forYear: new Date().getFullYear()
       });
-      
+
       toast.success("Notice created successfully!");
-      
-      // Redirect to the newly created notice's detail page
+
       if (newNotice && newNotice.id) {
         router.push(`/dashboard/tenant-notice/${newNotice.id}`);
       } else {
-        // Fallback to list page if no ID is returned
         router.push("/dashboard/tenant-notice");
       }
     } catch (error) {
@@ -440,7 +426,7 @@ export default function CreateNoticePage() {
             z-index: 2;
           }
         }
-        
+
         /* Custom text justification styles */
         .text-justify-full {
           text-align: justify;
@@ -449,7 +435,7 @@ export default function CreateNoticePage() {
           -webkit-hyphens: auto;
           -ms-hyphens: auto;
         }
-        
+
         .text-justify-full:after {
           content: "";
           display: inline-block;
@@ -477,7 +463,7 @@ export default function CreateNoticePage() {
           z-index: 2;
         }
       `}</style>
-      
+
       <div className="container mx-auto py-6">
         <div className="flex gap-6">
           {/* Form Section - Left Side */}
@@ -491,12 +477,12 @@ export default function CreateNoticePage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  
+
                   {/* Basic Information Section */}
                   <div className="space-y-4">
                     <div className="border-l-4 border-blue-500 pl-4">
                       <h3 className="text-lg font-semibold text-gray-900 mb-3">Basic Information</h3>
-                      
+
                       <div className="grid grid-cols-1 gap-4">
                         {/* Tenant Selection with Combobox */}
                         <div className="space-y-1.5">
@@ -514,18 +500,18 @@ export default function CreateNoticePage() {
                               >
                                 {formData.tenantId
                                   ? (() => {
-                                      const tenant = tenants.find((t) => t.id === formData.tenantId);
-                                      return tenant ? `${tenant.bpCode} — ${tenant.businessName}` : "Select tenant...";
-                                    })()
+                                    const tenant = tenants.find((t) => t.id === formData.tenantId);
+                                    return tenant ? `${tenant.bpCode} — ${tenant.businessName}` : "Select tenant...";
+                                  })()
                                   : "Select tenant..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-full p-0">
                               <Command>
-                                <CommandInput 
-                                  placeholder="Search tenant..." 
-                                  className="h-9" 
+                                <CommandInput
+                                  placeholder="Search tenant..."
+                                  className="h-9"
                                 />
                                 <CommandEmpty>No tenant found.</CommandEmpty>
                                 <CommandGroup className="max-h-64 overflow-y-auto">
@@ -594,18 +580,18 @@ export default function CreateNoticePage() {
                     <div className="border-l-4 border-green-500 pl-4">
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-semibold text-gray-900">Notice Items</h3>
-                        <Button 
-                          type="button" 
-                          onClick={addItem} 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          type="button"
+                          onClick={addItem}
+                          variant="outline"
+                          size="sm"
                           className="flex items-center gap-2 hover:bg-green-50 hover:border-green-300"
                         >
                           <Plus className="h-4 w-4" />
                           Add Item
                         </Button>
                       </div>
-                      
+
                       <div className="space-y-4">
                         {items.map((item, index) => (
                           <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -619,10 +605,10 @@ export default function CreateNoticePage() {
                                 Item {index + 1}
                               </h4>
                               {items.length > 1 && (
-                                <Button 
-                                  type="button" 
-                                  onClick={() => removeItem(index)} 
-                                  variant="outline" 
+                                <Button
+                                  type="button"
+                                  onClick={() => removeItem(index)}
+                                  variant="outline"
                                   size="sm"
                                   className="text-red-600 hover:bg-red-50 hover:border-red-300"
                                 >
@@ -630,28 +616,24 @@ export default function CreateNoticePage() {
                                 </Button>
                               )}
                             </div>
-                            
+
                             <div className="space-y-3">
                               {/* First Row: Item Type and Description */}
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
                                   <Label className="flex items-center gap-2 text-sm font-medium">
                                     <FileText className="h-4 w-4 text-gray-600" />
-                                    Item Type
+                                    Item Type <span className="text-red-500">*</span>
                                   </Label>
                                   <Select
                                     value={item.itemType}
                                     onValueChange={(value) => {
-                                      // Get the selected type object
                                       const selectedType = ITEM_TYPES.find(type => type.value === value);
-
-                                      // Create a new items array with the updated item
                                       const updatedItems = items.map((i, idx) => {
                                         if (idx === index) {
                                           return {
                                             ...i,
                                             itemType: value,
-                                            // Automatically set description based on the selected label
                                             description: selectedType ? selectedType.label : i.description,
                                           };
                                         }
@@ -661,6 +643,7 @@ export default function CreateNoticePage() {
                                     }}
                                   >
                                     <SelectTrigger className="h-11">
+                                      {/* Use a placeholder when the value is an empty string */}
                                       <SelectValue placeholder="Select item type..." />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -700,10 +683,10 @@ export default function CreateNoticePage() {
                                   <Select>
                                     <SelectTrigger className="h-11">
                                       <SelectValue placeholder={
-                                        item.months.length === 0 
-                                          ? "Select months..." 
+                                        item.months.length === 0
+                                          ? "Select months..."
                                           : `${item.months.length} month${item.months.length > 1 ? 's' : ''} selected`
-                                        } />
+                                      } />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {MONTHS.map((month) => (
@@ -723,7 +706,7 @@ export default function CreateNoticePage() {
                                           <input
                                             type="checkbox"
                                             checked={item.months.includes(month)}
-                                            onChange={() => {}} // Handled by parent onClick
+                                            onChange={() => {}}
                                             className="rounded"
                                           />
                                           <span className="text-sm">{month}</span>
@@ -830,9 +813,9 @@ export default function CreateNoticePage() {
                         <UserCheck className="h-5 w-5" />
                         Signatories
                       </h3>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         size="sm"
                         onClick={() => setShowSignatories(!showSignatories)}
                         className="hover:bg-blue-50"
@@ -840,7 +823,7 @@ export default function CreateNoticePage() {
                         {showSignatories ? 'Hide' : 'Edit'} Signatories
                       </Button>
                     </div>
-                    
+
                     {showSignatories && (
                       <div className="border rounded-lg p-4 bg-gray-50">
                         <div className="grid grid-cols-2 gap-8">
@@ -850,7 +833,7 @@ export default function CreateNoticePage() {
                               <UserCheck className="h-4 w-4" />
                               Credit & Collection Officer
                             </h4>
-                            
+
                             <div className="grid grid-cols-1 gap-3">
                               <div className="space-y-2">
                                 <Label className="text-xs font-medium text-gray-700">Full Name</Label>
@@ -890,7 +873,7 @@ export default function CreateNoticePage() {
                               <User className="h-4 w-4" />
                               AVP - Finance/Controller
                             </h4>
-                            
+
                             <div className="grid grid-cols-1 gap-3">
                               <div className="space-y-2">
                                 <Label className="text-xs font-medium text-gray-700">Full Name</Label>
@@ -927,8 +910,8 @@ export default function CreateNoticePage() {
                     >
                       Cancel
                     </Button>
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       disabled={loading || !formData.tenantId}
                       className="px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
                     >
@@ -964,35 +947,35 @@ export default function CreateNoticePage() {
                       {/* Left side - Date, Company, and Content */}
                       <div className="flex-1 print:pl-0">
                         {/* Date and Company Info */}
-                        <div className="text-sm mb-3">{new Date().toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: '2-digit' 
+                        <div className="text-sm mb-3">{new Date().toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: '2-digit'
                         })}</div>
                         <div className="font-bold text-lg mb-1">
                           {selectedTenant ? selectedTenant.businessName.toUpperCase() : 'SELECT TENANT'}
                         </div>
                         <div className="text-sm mb-6">General Santos City</div>
-                        
+
                         {/* Title - now positioned at the same level as Philippines */}
                         <div className="text-center mb-4 mt-16">
                           <h2 className="text-base font-bold underline ml-48">
                             {getNoticeTitle(formData.noticeType)}
                           </h2>
                         </div>
-                        
+
                         {/* Salutation */}
                         <div className="mt-6">
                           <p className="text-sm">Dear Sir/Ma&apos;am:</p>
                         </div>
                       </div>
-                      
+
                       {/* Right side - Company Header */}
                       <div className="text-right mr-[-20px] mt-[-30px] print:pr-1">
                         <div className="mb-1 flex items-center justify-center">
-                          <Image 
-                            src='/rdrdc.png' 
-                            alt="RD Realty Development Corporation Logo" 
+                          <Image
+                            src='/rdrdc.png'
+                            alt="RD Realty Development Corporation Logo"
                             width={80}
                             height={80}
                             className="object-contain"
@@ -1034,7 +1017,7 @@ export default function CreateNoticePage() {
                           {items.filter(item => item.description || item.amount).map((item, index) => {
                             const displayStatus = item.status === "CUSTOM" ? item.customStatus : item.status.replace('_', ' ');
                             const displayMonths = formatMonthRange(item.months);
-                            
+
                             return (
                               <tr key={index} className="border-b border-black">
                                 <td className="px-1 py-1 font-semibold text-xs">{item.description || 'Description'}</td>
@@ -1082,7 +1065,7 @@ export default function CreateNoticePage() {
                       {/* Primary Signatory */}
                       <div className="mb-4 signature-container">
                         {getSignatureImage(formData.primarySignatory) && (
-                          <Image 
+                          <Image
                             src={getSignatureImage(formData.primarySignatory)!}
                             alt={`${formData.primarySignatory} signature`}
                             width={80}
@@ -1098,15 +1081,15 @@ export default function CreateNoticePage() {
                         <div className="text-xs">{formData.primaryTitle}</div>
                         <div className="text-xs">Mobile: {formData.primaryContact}</div>
                       </div>
-                      
+
                       <div className="mb-1">
                         <div className="text-xs">Noted By:</div>
                       </div>
-                      
+
                       {/* Secondary Signatory */}
                       <div className="mt-4 signature-container">
                         {getSignatureImage(formData.secondarySignatory) && (
-                          <Image 
+                          <Image
                             src={getSignatureImage(formData.secondarySignatory)!}
                             alt={`${formData.secondarySignatory} signature`}
                             width={150}
