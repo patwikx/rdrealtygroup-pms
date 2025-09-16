@@ -311,7 +311,7 @@ export default function TenantNoticesPage() {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Filters */}
-        <div className="w-80 bg-white border-r p-4 overflow-y-auto">
+        <div className="w-60 bg-white border-r p-4 overflow-y-auto">
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-4">
               <Filter className="h-4 w-4 text-gray-600" />
